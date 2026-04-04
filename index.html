@@ -28,6 +28,11 @@
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    /* 確保日期選擇器不會強制溢出 */
+    input[type="date"] {
+      -webkit-appearance: none;
+      min-width: 0;
+    }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
@@ -66,7 +71,6 @@
 
     const { useState, useEffect, useRef } = React;
     const CATEGORIES = ['小卡', '專輯', '娃娃', '野周', '其他'];
-    // 新增：許願池專用的分類列表
     const WISH_CATEGORIES = ['未到貨', ...CATEGORIES];
 
     function App() {
@@ -111,7 +115,7 @@
 
       const todayStr = new Date().toISOString().split('T')[0];
       const [newItem, setNewItem] = useState({ name: '', price: '', date: todayStr, image: null, category: '小卡' });
-      // 許願物品預設分類改為'未到貨'
+      const [newFund, setNewFund] = useState({ amount: '', reason: '', date: todayStr });
       const [newWish, setNewWish] = useState({ name: '', price: '', date: todayStr, image: null, category: '未到貨' }); 
 
       const showToast = (msg, type = 'success') => {
@@ -135,7 +139,6 @@
           setItems([]); setFunds([]); setWishes([]); return;
         }
 
-        // 讀取個人設定
         const profileRef = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('profile').doc('info');
         profileRef.onSnapshot((docSnap) => {
           if (docSnap.exists) { 
@@ -158,27 +161,20 @@
           } catch(e) { return 0; }
         };
 
-        // 即時讀取戰利品
         const itemsRef = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('stanchases');
         const unsubscribeItems = itemsRef.onSnapshot({ includeMetadataChanges: true }, (snapshot) => {
             const fetchedItems = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             fetchedItems.sort(safeSort);
             setItems(fetchedItems);
-        }, (error) => {
-          console.error("讀取戰利品失敗:", error);
-        });
+        }, (error) => console.error("讀取戰利品失敗:", error));
 
-        // 即時讀取許願池
         const wishesRef = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('wishes');
         const unsubscribeWishes = wishesRef.onSnapshot({ includeMetadataChanges: true }, (snapshot) => {
             const fetchedWishes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             fetchedWishes.sort(safeSort);
             setWishes(fetchedWishes);
-        }, (error) => {
-          console.error("讀取許願池失敗:", error);
-        });
+        }, (error) => console.error("讀取許願池失敗:", error));
 
-        // 即時讀取基金
         const fundsRef = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('funds');
         const unsubscribeFunds = fundsRef.onSnapshot({ includeMetadataChanges: true }, (snapshot) => {
             const fetchedFunds = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -446,7 +442,6 @@
               )}
               {(!profileData || !profileData.dashboardBg) && (<div className="absolute -right-8 -top-8 opacity-10 rotate-12 z-0"><i className="fa-solid fa-credit-card text-[180px]"></i></div>)}
               
-              {/* === 絕對定位的按鈕，不佔用版面空間，確保卡片不會變大 === */}
               <button 
                 onClick={() => setIsWishlistOpen(true)} 
                 className="absolute top-5 left-5 z-20 bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/30 text-white px-3 py-1.5 rounded-full text-xs font-bold tracking-wider inline-flex items-center gap-1.5 transition-all shadow-sm"
@@ -603,7 +598,6 @@
               {/* 許願池內容區 */}
               <div className="flex-1 overflow-y-auto p-4 max-w-4xl w-full mx-auto pb-24">
                 <div className="flex gap-2 overflow-x-auto scrollbar-hide mb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
-                  {/* === 更新：使用許願池專用的分類列表 (包含未到貨) === */}
                   {['全部', ...WISH_CATEGORIES].map(c => (
                     <button key={c} onClick={() => setActiveWishCategory(c)} className={`whitespace-nowrap px-6 py-2.5 rounded-full text-sm font-bold transition-all shadow-sm ${activeWishCategory === c ? 'bg-yellow-500 text-white shadow-yellow-500/20' : 'bg-white text-slate-600 border border-slate-200'}`}>{c}</button>
                   ))}
@@ -668,19 +662,23 @@
                     )}
                   </div>
                   <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                    {/* === 更新：使用許願池專用的分類列表 (包含未到貨) === */}
                     {WISH_CATEGORIES.map(c => (
                       <button type="button" key={c} onClick={() => setNewWish({...newWish, category: c})} className={`px-5 py-2 rounded-full text-xs font-bold border transition-all ${newWish.category === c ? 'bg-yellow-500 text-white border-yellow-500 shadow-md shadow-yellow-500/20' : 'bg-white text-slate-500'}`}>{c}</button>
                     ))}
                   </div>
                   <input type="text" required value={newWish.name} onChange={e => setNewWish({...newWish, name: e.target.value})} className="w-full p-4 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400" placeholder="想要什麼酷東西？" disabled={isLoading} />
+                  
+                  {/* === 修改：新增 min-w-0 與微調 px/py 以解決日期框溢出 === */}
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="relative">
-                      <i className="fa-solid fa-dollar-sign absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                      <input type="number" required min="0" value={newWish.price} onChange={e => setNewWish({...newWish, price: e.target.value})} className="w-full p-4 pl-8 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400 font-bold" placeholder="目標金額" disabled={isLoading} />
+                    <div className="relative min-w-0">
+                      <i className="fa-solid fa-dollar-sign absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                      <input type="number" required min="0" value={newWish.price} onChange={e => setNewWish({...newWish, price: e.target.value})} className="w-full min-w-0 py-3.5 pl-8 pr-3 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400 font-bold" placeholder="目標金額" disabled={isLoading} />
                     </div>
-                    <input type="date" value={newWish.date} onChange={e => setNewWish({...newWish, date: e.target.value})} className="w-full p-4 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400 text-sm" disabled={isLoading} />
+                    <div className="relative min-w-0">
+                      <input type="date" value={newWish.date} onChange={e => setNewWish({...newWish, date: e.target.value})} className="w-full min-w-0 px-3 py-3.5 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400 text-sm" disabled={isLoading} />
+                    </div>
                   </div>
+                  
                   <div className="pt-2 flex gap-3">
                     <button type="button" onClick={closeWishModal} disabled={isLoading} className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold">取消</button>
                     <button type="submit" disabled={isLoading} className="flex-[2] bg-yellow-500 text-white py-4 rounded-2xl font-bold shadow-lg shadow-yellow-500/20 transition-transform active:scale-95 flex justify-center items-center">
@@ -717,13 +715,18 @@
                     ))}
                   </div>
                   <input type="text" required value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="w-full p-4 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400" placeholder="買了什麼？" disabled={isLoading} />
+                  
+                  {/* === 修改：新增 min-w-0 與微調 px/py 以解決日期框溢出 === */}
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="relative">
-                      <i className="fa-solid fa-dollar-sign absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                      <input type="number" required min="0" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-full p-4 pl-8 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400 font-bold" placeholder="多少錢" disabled={isLoading} />
+                    <div className="relative min-w-0">
+                      <i className="fa-solid fa-dollar-sign absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                      <input type="number" required min="0" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-full min-w-0 py-3.5 pl-8 pr-3 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400 font-bold" placeholder="多少錢" disabled={isLoading} />
                     </div>
-                    <input type="date" value={newItem.date} onChange={e => setNewItem({...newItem, date: e.target.value})} className="w-full p-4 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400 text-sm" disabled={isLoading} />
+                    <div className="relative min-w-0">
+                      <input type="date" value={newItem.date} onChange={e => setNewItem({...newItem, date: e.target.value})} className="w-full min-w-0 px-3 py-3.5 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400 text-sm" disabled={isLoading} />
+                    </div>
                   </div>
+
                   <div className="pt-2 flex gap-3">
                     <button type="button" onClick={closeItemModal} disabled={isLoading} className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold">取消</button>
                     <button type="submit" disabled={isLoading} className="flex-[2] bg-yellow-500 text-white py-4 rounded-2xl font-bold shadow-lg shadow-yellow-500/20 transition-transform active:scale-95 flex justify-center items-center">
