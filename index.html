@@ -103,6 +103,9 @@
       const [isPackageListOpen, setIsPackageListOpen] = useState(false); 
       const [isPackageFormOpen, setIsPackageFormOpen] = useState(false); 
       
+      // 自訂確認刪除彈窗狀態
+      const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, message: '', onConfirm: null });
+
       const [editingId, setEditingId] = useState(null); 
       const [editingWishId, setEditingWishId] = useState(null); 
       const [editingPackageId, setEditingPackageId] = useState(null); 
@@ -134,6 +137,16 @@
         setToastMessage(msg);
         setToastType(type);
         setTimeout(() => setToastMessage(''), 3000);
+      };
+
+      // 呼叫確認刪除彈窗
+      const openConfirmDelete = (message, confirmAction) => {
+        setConfirmDialog({ isOpen: true, message, onConfirm: confirmAction });
+      };
+
+      // 關閉確認刪除彈窗
+      const closeConfirmDelete = () => {
+        setConfirmDialog({ isOpen: false, message: '', onConfirm: null });
       };
 
       // === 1. 監聽登入狀態 ===
@@ -194,6 +207,7 @@
             setFunds(fetchedFunds);
         }, (error) => console.error("讀取基金失敗:", error));
 
+        // 讀取包裹
         const packagesRef = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('packages');
         const unsubscribePackages = packagesRef.onSnapshot({ includeMetadataChanges: true }, (snapshot) => {
             const fetchedPackages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -357,7 +371,7 @@
         if (!user) return;
         try { 
           await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('stanchases').doc(id).delete();
-          setSwipedItemId(null); showToast('紀錄已刪除');
+          showToast('紀錄已刪除');
         } catch (error) { showToast('刪除失敗', 'error'); }
       };
 
@@ -365,7 +379,7 @@
         if (!user) return;
         try { 
           await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('wishes').doc(id).delete();
-          setSwipedWishId(null); showToast('已從許願池移除');
+          showToast('已從許願池移除');
         } catch (error) { showToast('刪除失敗', 'error'); }
       };
 
@@ -373,7 +387,7 @@
         if (!user) return;
         try { 
           await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('packages').doc(id).delete();
-          setSwipedPackageId(null); showToast('包裹已移除');
+          showToast('包裹已移除');
         } catch (error) { showToast('刪除失敗', 'error'); }
       };
 
@@ -402,7 +416,10 @@
 
       const closeItemModal = () => { setIsModalOpen(false); setEditingId(null); setNewItem({ name: '', price: '', date: todayStr, image: null, category: '小卡' }); };
       const closeWishModal = () => { setIsWishModalOpen(false); setEditingWishId(null); setNewWish({ name: '', price: '', date: todayStr, image: null, category: '小卡' }); };
-      const closePackageModal = () => { setIsPackageFormOpen(false); setEditingPackageId(null); setNewPackage({ name: '', price: '', date: todayStr, image: null, category: '未出貨', orderNumber: '', seller: '', buyer: '', website: '' }); };
+      const closePackageModal = () => { 
+        setIsPackageFormOpen(false); setEditingPackageId(null); 
+        setNewPackage({ name: '', price: '', date: todayStr, image: null, category: '未出貨', orderNumber: '', seller: '', buyer: '', website: '' }); 
+      };
 
       const handleAddFund = async (e) => {
         e.preventDefault();
@@ -435,22 +452,18 @@
         }
       };
 
-      // === 過濾列表資料 ===
-      const filteredItems = activeCategory === '全部' ? items : items.filter(i => (i.category || '其他') === activeCategory);
-      const filteredWishes = activeWishCategory === '全部' ? wishes : wishes.filter(w => (w.category || '其他') === activeWishCategory);
-      const filteredPackages = activePackageCategory === '全部' ? packages : packages.filter(p => (p.category || '未出貨') === activePackageCategory);
-
-      // === 財務計算 (根據目前顯示的過濾結果動態加總) ===
+      // 財務計算
       const formatCurrency = (val) => new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0 }).format(val || 0);
       const totalFunds = funds.reduce((sum, f) => sum + (Number(f.amount) || 0), 0);
       const totalSpent = items.reduce((sum, i) => sum + (Number(i.price) || 0), 0);
-      
-      // 動態計算：只加總畫面上顯示的項目
-      const totalWishAmount = filteredWishes.reduce((sum, w) => sum + (Number(w.price) || 0), 0); 
-      const totalPackageAmount = filteredPackages.reduce((sum, p) => sum + (Number(p.price) || 0), 0); 
-      
+      const totalWishAmount = wishes.reduce((sum, w) => sum + (Number(w.price) || 0), 0); 
+      const totalPackageAmount = packages.reduce((sum, p) => sum + (Number(p.price) || 0), 0); 
       const balance = totalFunds - totalSpent;
       const displayNickname = profileData?.nickname || '專屬用戶';
+
+      const filteredItems = activeCategory === '全部' ? items : items.filter(i => (i.category || '其他') === activeCategory);
+      const filteredWishes = activeWishCategory === '全部' ? wishes : wishes.filter(w => (w.category || '其他') === activeWishCategory);
+      const filteredPackages = activePackageCategory === '全部' ? packages : packages.filter(p => (p.category || '未出貨') === activePackageCategory);
 
       // ==========================================
       // 畫面渲染
@@ -492,10 +505,28 @@
 
       // 已登入狀態 - 主畫面
       return (
-        <div className="min-h-screen bg-slate-50 text-slate-800 pb-24 overflow-x-hidden">
+        <div className="min-h-screen bg-slate-50 text-slate-800 pb-24 overflow-x-hidden relative">
+          
+          {/* === 自訂確認刪除彈窗 === */}
+          {confirmDialog.isOpen && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-white rounded-3xl w-full max-w-xs p-6 shadow-2xl animate-in zoom-in-95 flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4 text-red-500">
+                  <i className="fa-solid fa-triangle-exclamation text-3xl"></i>
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">{confirmDialog.message}</h3>
+                <p className="text-sm text-slate-500 mb-6">刪除後將無法復原，確定要繼續嗎？</p>
+                <div className="flex gap-3 w-full">
+                  <button onClick={closeConfirmDelete} className="flex-1 bg-slate-100 text-slate-600 py-3 rounded-2xl font-bold transition-colors hover:bg-slate-200 active:scale-95">我再想想</button>
+                  <button onClick={() => { if(confirmDialog.onConfirm) confirmDialog.onConfirm(); closeConfirmDelete(); }} className="flex-1 bg-red-500 text-white py-3 rounded-2xl font-bold shadow-lg shadow-red-500/20 transition-transform active:scale-95">確認刪除</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Toast 提示 */}
           {toastMessage && (
-            <div className={`fixed top-10 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-full shadow-lg flex items-center gap-2 animate-in slide-in-from-top-4 text-sm ${toastType === 'error' ? 'bg-red-600 text-white' : 'bg-slate-800 text-white'}`}>
+            <div className={`fixed top-10 left-1/2 -translate-x-1/2 z-[110] px-6 py-3 rounded-full shadow-lg flex items-center gap-2 animate-in slide-in-from-top-4 text-sm ${toastType === 'error' ? 'bg-red-600 text-white' : 'bg-slate-800 text-white'}`}>
               {toastType === 'error' ? <i className="fa-solid fa-circle-exclamation"></i> : <i className="fa-solid fa-circle-check text-green-400"></i>}{toastMessage}
             </div>
           )}
@@ -509,7 +540,7 @@
           </header>
 
           <main className="max-w-4xl mx-auto px-4 py-6 space-y-8">
-            {/* 看板卡片 */}
+            {/* === 修改：去除 pt-2 與多餘 border，恢復完美原始大小 === */}
             <div className="rounded-3xl p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden min-h-[220px] flex items-center group">
               {profileData?.dashboardBg ? (
                 <div className="absolute inset-0 bg-cover bg-center z-0 transition-transform duration-700 group-hover:scale-105" style={{ backgroundImage: `url(${profileData.dashboardBg})` }}><div className="absolute inset-0 bg-slate-900/30"></div></div>
@@ -518,15 +549,14 @@
               )}
               {(!profileData || !profileData.dashboardBg) && (<div className="absolute -right-8 -top-8 opacity-10 rotate-12 z-0"><i className="fa-solid fa-credit-card text-[180px]"></i></div>)}
               
-              {/* === 修改：改成橫向排列，節省垂直空間，恢復卡片原始比例 === */}
-              <div className="absolute top-5 left-5 sm:top-6 sm:left-6 z-20 flex flex-row gap-2 items-center">
+              {/* === 完美解法：改用 flex-row (左右並排) 絕對不會佔用下方空間 === */}
+              <div className="absolute top-5 left-5 z-20 flex gap-2 items-center">
                 <button 
                   onClick={() => setIsWishlistOpen(true)} 
                   className="bg-black/10 hover:bg-black/20 backdrop-blur-md border border-white/20 text-white px-3 py-1.5 rounded-full text-xs font-bold tracking-wider inline-flex items-center gap-1.5 transition-all shadow-sm"
                 >
                   <i className="fa-solid fa-star text-yellow-300 drop-shadow-sm"></i> <span className="drop-shadow-sm">許願池</span>
                 </button>
-                
                 <button 
                   onClick={() => setIsPackageListOpen(true)} 
                   className="bg-black/10 hover:bg-black/20 backdrop-blur-md border border-white/20 text-white px-3 py-1.5 rounded-full text-xs font-bold tracking-wider inline-flex items-center gap-1.5 transition-all shadow-sm"
@@ -535,7 +565,7 @@
                 </button>
               </div>
 
-              {/* 拿掉之前增加高度的 pt-2，完全恢復原本的內部排版高度 */}
+              {/* === 恢復原始的內部排版，完全無多餘 padding === */}
               <div className="relative z-10 w-full flex flex-col sm:flex-row justify-between items-end gap-6">
                 <div className="space-y-4">
                   {profileData?.fandom && (<div className="bg-black/10 backdrop-blur-md border border-white/20 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest inline-flex items-center gap-1.5 uppercase drop-shadow-sm"><i className="fa-solid fa-heart text-[10px]"></i> {profileData.fandom}</div>)}
@@ -587,7 +617,7 @@
                     <div key={item.id} className="relative rounded-2xl overflow-hidden bg-white shadow-sm border border-slate-100 group">
                       <div className="absolute inset-y-0 right-0 flex w-[120px]">
                         <button onClick={() => handleEditClick(item)} className="w-1/2 bg-blue-500 text-white flex items-center justify-center"><i className="fa-solid fa-pen-to-square text-lg"></i></button>
-                        <button onClick={() => handleDeleteItem(item.id)} className="w-1/2 bg-red-500 text-white flex items-center justify-center"><i className="fa-solid fa-trash-can text-lg"></i></button>
+                        <button onClick={() => { setSwipedItemId(null); openConfirmDelete('確認刪除這筆戰利品？', () => handleDeleteItem(item.id)); }} className="w-1/2 bg-red-500 text-white flex items-center justify-center"><i className="fa-solid fa-trash-can text-lg"></i></button>
                       </div>
                       <div className={`relative z-10 bg-white w-full h-full transition-transform duration-300 ${swipedItemId === item.id ? '-translate-x-[120px]' : ''}`} onTouchStart={handleTouchStart} onTouchMove={(e) => handleTouchMove(e, item.id, 'item')}>
                         <div className="aspect-square bg-slate-50 relative overflow-hidden">
@@ -664,7 +694,7 @@
           )}
 
           {/* ============================================================== */}
-          {/* Modal: 待收包裹 主介面 (動態計算金額) */}
+          {/* Modal: 待收包裹 主介面 */}
           {/* ============================================================== */}
           {isPackageListOpen && (
             <div className="fixed inset-0 z-[50] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full overflow-hidden">
@@ -679,7 +709,6 @@
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-slate-400 font-bold mb-0.5">包裹總金額</p>
-                  {/* 顯示動態加總的金額 */}
                   <p className="text-xl sm:text-2xl font-black text-orange-500 tracking-tight">{formatCurrency(totalPackageAmount)}</p>
                 </div>
               </div>
@@ -703,11 +732,11 @@
                       <div key={pkg.id} className="relative rounded-2xl overflow-hidden bg-white shadow-sm border border-slate-100 group">
                         <div className="absolute inset-y-0 right-0 flex w-[120px]">
                           <button onClick={() => handleEditPackageClick(pkg)} className="w-1/2 bg-blue-500 text-white flex items-center justify-center"><i className="fa-solid fa-pen-to-square text-lg"></i></button>
-                          <button onClick={() => handleDeletePackage(pkg.id)} className="w-1/2 bg-red-500 text-white flex items-center justify-center"><i className="fa-solid fa-trash-can text-lg"></i></button>
+                          <button onClick={() => { setSwipedPackageId(null); openConfirmDelete('確認刪除這筆包裹？', () => handleDeletePackage(pkg.id)); }} className="w-1/2 bg-red-500 text-white flex items-center justify-center"><i className="fa-solid fa-trash-can text-lg"></i></button>
                         </div>
                         <div className={`relative z-10 bg-white w-full h-full transition-transform duration-300 ${swipedPackageId === pkg.id ? '-translate-x-[120px]' : ''}`} onTouchStart={handleTouchStart} onTouchMove={(e) => handleTouchMove(e, pkg.id, 'package')}>
                           <div className="aspect-square bg-slate-50 relative overflow-hidden">
-                            {pkg.image ? <img src={pkg.image} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-200 bg-slate-100"><i className="fa-solid fa-box text-4xl"></i></div>}
+                            {pkg.image ? <img src={pkg.image} className="w-full h-full object-cover opacity-90" /> : <div className="w-full h-full flex items-center justify-center text-slate-200 bg-slate-100"><i className="fa-solid fa-box text-4xl"></i></div>}
                             <div className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black uppercase backdrop-blur-sm shadow-sm
                               ${pkg.category === '已到貨' ? 'bg-green-500/90 text-white' : 
                                 pkg.category === '已出貨' ? 'bg-blue-500/90 text-white' : 
@@ -795,13 +824,13 @@
                     </div>
                     <div className="relative min-w-0">
                       <i className="fa-solid fa-user absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
-                      <input type="text" value={newPackage.buyer} onChange={e => setNewPackage({...newPackage, buyer: e.target.value})} className="w-full min-w-0 py-3.5 pl-9 pr-3 bg-white rounded-xl border outline-none focus:ring-2 focus:ring-orange-400 text-sm" placeholder="買家 (跟誰代購)" disabled={isLoading} />
+                      <input type="text" value={newPackage.buyer} onChange={e => setNewPackage({...newPackage, buyer: e.target.value})} className="w-full min-w-0 py-3.5 pl-9 pr-3 bg-white rounded-xl border outline-none focus:ring-2 focus:ring-orange-400 text-sm" placeholder="買家 (代購)" disabled={isLoading} />
                     </div>
                   </div>
 
                   <div className="relative min-w-0 pb-2">
                     <i className="fa-solid fa-globe absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
-                    <input type="text" value={newPackage.website} onChange={e => setNewPackage({...newPackage, website: e.target.value})} className="w-full min-w-0 py-3.5 pl-10 pr-4 bg-white rounded-xl border outline-none focus:ring-2 focus:ring-orange-400 text-sm" placeholder="購買網站 (例如: 蝦皮、微店)" disabled={isLoading} />
+                    <input type="text" value={newPackage.website} onChange={e => setNewPackage({...newPackage, website: e.target.value})} className="w-full min-w-0 py-3.5 pl-10 pr-4 bg-white rounded-xl border outline-none focus:ring-2 focus:ring-orange-400 text-sm" placeholder="購買網站 (如: 蝦皮、微店)" disabled={isLoading} />
                   </div>
                   
                   <div className="pt-2 flex gap-3 sticky bottom-0 bg-white">
@@ -816,7 +845,7 @@
           )}
 
           {/* ============================================================== */}
-          {/* Modal: 許願池主介面 (動態計算金額) */}
+          {/* Modal: 許願池主介面 */}
           {/* ============================================================== */}
           {isWishlistOpen && (
             <div className="fixed inset-0 z-[50] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full overflow-hidden">
@@ -831,7 +860,6 @@
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-slate-400 font-bold mb-0.5">總需金額</p>
-                  {/* 顯示動態加總的金額 */}
                   <p className="text-xl sm:text-2xl font-black text-yellow-500 tracking-tight">{formatCurrency(totalWishAmount)}</p>
                 </div>
               </div>
@@ -855,7 +883,7 @@
                       <div key={wish.id} className="relative rounded-2xl overflow-hidden bg-white shadow-sm border border-slate-100 group">
                         <div className="absolute inset-y-0 right-0 flex w-[120px]">
                           <button onClick={() => handleEditWishClick(wish)} className="w-1/2 bg-blue-500 text-white flex items-center justify-center"><i className="fa-solid fa-pen-to-square text-lg"></i></button>
-                          <button onClick={() => handleDeleteWish(wish.id)} className="w-1/2 bg-red-500 text-white flex items-center justify-center"><i className="fa-solid fa-trash-can text-lg"></i></button>
+                          <button onClick={() => { setSwipedWishId(null); openConfirmDelete('確認刪除這個許願？', () => handleDeleteWish(wish.id)); }} className="w-1/2 bg-red-500 text-white flex items-center justify-center"><i className="fa-solid fa-trash-can text-lg"></i></button>
                         </div>
                         <div className={`relative z-10 bg-white w-full h-full transition-transform duration-300 ${swipedWishId === wish.id ? '-translate-x-[120px]' : ''}`} onTouchStart={handleTouchStart} onTouchMove={(e) => handleTouchMove(e, wish.id, 'wish')}>
                           <div className="aspect-square bg-slate-50 relative overflow-hidden">
@@ -1019,7 +1047,7 @@
                         <div><p className="font-bold text-slate-700 text-sm">{f.reason}</p><p className="text-[10px] text-slate-400 uppercase mt-0.5">{f.date}</p></div>
                         <div className="flex items-center gap-3">
                           <span className="text-green-600 font-black">+{formatCurrency(f.amount)}</span>
-                          <button type="button" onClick={() => handleDeleteFund(f.id)} className="text-slate-200 hover:text-red-500 transition-colors p-2"><i className="fa-solid fa-trash-can"></i></button>
+                          <button type="button" onClick={() => openConfirmDelete('確認刪除這筆餵食紀錄？', () => handleDeleteFund(f.id))} className="text-slate-200 hover:text-red-500 transition-colors p-2"><i className="fa-solid fa-trash-can"></i></button>
                         </div>
                       </div>
                     ))
@@ -1037,5 +1065,4 @@
   </script>
 </body>
 </html>
-
 
