@@ -71,7 +71,7 @@
 
     const { useState, useEffect, useRef } = React;
     const CATEGORIES = ['小卡', '專輯', '娃娃', '野周', '其他'];
-    const WISH_CATEGORIES = ['未到貨', ...CATEGORIES];
+    const PACKAGE_CATEGORIES = ['未出貨', '已出貨', '已到貨']; 
 
     function App() {
       // === 狀態管理 ===
@@ -80,13 +80,17 @@
       const [items, setItems] = useState([]); 
       const [funds, setFunds] = useState([]); 
       const [wishes, setWishes] = useState([]); 
+      const [packages, setPackages] = useState([]); 
       const [profileData, setProfileData] = useState({ nickname: '', fandom: '', bio: '努力為愛發電，聰明控制預算！', avatar: null, dashboardBg: null });
       
       // UI 控制
       const [activeCategory, setActiveCategory] = useState('全部');
       const [activeWishCategory, setActiveWishCategory] = useState('全部'); 
+      const [activePackageCategory, setActivePackageCategory] = useState('全部'); 
+      
       const [swipedItemId, setSwipedItemId] = useState(null);
       const [swipedWishId, setSwipedWishId] = useState(null); 
+      const [swipedPackageId, setSwipedPackageId] = useState(null); 
       const [touchStartX, setTouchStartX] = useState(0);
       
       // Modal 控制
@@ -96,9 +100,12 @@
       const [isFundHistoryOpen, setIsFundHistoryOpen] = useState(false); 
       const [isWishlistOpen, setIsWishlistOpen] = useState(false); 
       const [isWishModalOpen, setIsWishModalOpen] = useState(false); 
+      const [isPackageListOpen, setIsPackageListOpen] = useState(false); 
+      const [isPackageFormOpen, setIsPackageFormOpen] = useState(false); 
       
       const [editingId, setEditingId] = useState(null); 
       const [editingWishId, setEditingWishId] = useState(null); 
+      const [editingPackageId, setEditingPackageId] = useState(null); 
       
       const [isLoading, setIsLoading] = useState(false);
       const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -116,7 +123,12 @@
       const todayStr = new Date().toISOString().split('T')[0];
       const [newItem, setNewItem] = useState({ name: '', price: '', date: todayStr, image: null, category: '小卡' });
       const [newFund, setNewFund] = useState({ amount: '', reason: '', date: todayStr });
-      const [newWish, setNewWish] = useState({ name: '', price: '', date: todayStr, image: null, category: '未到貨' }); 
+      const [newWish, setNewWish] = useState({ name: '', price: '', date: todayStr, image: null, category: '小卡' }); 
+      
+      const [newPackage, setNewPackage] = useState({ 
+        name: '', price: '', date: todayStr, image: null, category: '未出貨',
+        orderNumber: '', seller: '', buyer: '', website: '' 
+      }); 
 
       const showToast = (msg, type = 'success') => {
         setToastMessage(msg);
@@ -136,7 +148,7 @@
       // === 2. 獲取資料 ===
       useEffect(() => {
         if (!user) {
-          setItems([]); setFunds([]); setWishes([]); return;
+          setItems([]); setFunds([]); setWishes([]); setPackages([]); return;
         }
 
         const profileRef = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('profile').doc('info');
@@ -182,7 +194,14 @@
             setFunds(fetchedFunds);
         }, (error) => console.error("讀取基金失敗:", error));
 
-        return () => { unsubscribeItems(); unsubscribeFunds(); unsubscribeWishes(); };
+        const packagesRef = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('packages');
+        const unsubscribePackages = packagesRef.onSnapshot({ includeMetadataChanges: true }, (snapshot) => {
+            const fetchedPackages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            fetchedPackages.sort(safeSort);
+            setPackages(fetchedPackages);
+        }, (error) => console.error("讀取包裹失敗:", error));
+
+        return () => { unsubscribeItems(); unsubscribeFunds(); unsubscribeWishes(); unsubscribePackages(); };
       }, [user]);
 
       // === 登入/註冊流程 ===
@@ -218,6 +237,7 @@
           setAuthForm({ email: user?.email || '', password: '', confirmPassword: '' });
           setIsProfileOpen(false);
           setIsWishlistOpen(false);
+          setIsPackageListOpen(false);
           showToast('已安全登出');
         } catch(e) { console.error(e); }
       };
@@ -247,6 +267,7 @@
       const handleDashboardBgUpload = (e) => processImage(e.target.files[0], 600, (dataUrl) => setProfileData(p => ({...(p || {}), dashboardBg: dataUrl})));
       const handleItemImageUpload = (e) => processImage(e.target.files[0], 500, (dataUrl) => setNewItem(p => ({...(p || {}), image: dataUrl})));
       const handleWishImageUpload = (e) => processImage(e.target.files[0], 500, (dataUrl) => setNewWish(p => ({...(p || {}), image: dataUrl})));
+      const handlePackageImageUpload = (e) => processImage(e.target.files[0], 500, (dataUrl) => setNewPackage(p => ({...(p || {}), image: dataUrl})));
 
       // === 資料庫操作 ===
       const handleSaveProfile = async (e) => {
@@ -261,7 +282,6 @@
         } catch (error) { showToast('儲存失敗，請重試', 'error'); } finally { setIsSavingProfile(false); }
       };
 
-      // 儲存戰利品
       const handleSaveItem = async (e) => {
         e.preventDefault();
         if (!newItem.name || !newItem.price) { showToast('請填寫物品名稱與金額！', 'error'); return; }
@@ -283,7 +303,6 @@
         } finally { setIsLoading(false); }
       };
 
-      // 儲存許願物品
       const handleSaveWish = async (e) => {
         e.preventDefault();
         if (!newWish.name || !newWish.price) { showToast('請填寫物品名稱與金額！', 'error'); return; }
@@ -305,6 +324,35 @@
         } finally { setIsLoading(false); }
       };
 
+      const handleSavePackage = async (e) => {
+        e.preventDefault();
+        if (!newPackage.name || !newPackage.price) { showToast('請填寫包裹名稱與金額！', 'error'); return; }
+        if (!user) return;
+        setIsLoading(true);
+        try {
+          const packagesCol = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('packages');
+          const dataToSave = { 
+            name: newPackage.name, price: parseFloat(newPackage.price), date: newPackage.date, 
+            image: newPackage.image, category: newPackage.category,
+            orderNumber: newPackage.orderNumber || '',
+            seller: newPackage.seller || '',
+            buyer: newPackage.buyer || '',
+            website: newPackage.website || ''
+          };
+          
+          if (editingPackageId) {
+            await packagesCol.doc(editingPackageId).update(dataToSave);
+            showToast('包裹狀態已更新！');
+          } else {
+            await packagesCol.add({ ...dataToSave, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+            showToast('包裹已新增！');
+          }
+          closePackageModal();
+        } catch (error) { 
+          showToast('儲存發生異常，已離線備份', 'error'); closePackageModal(); 
+        } finally { setIsLoading(false); }
+      };
+
       const handleDeleteItem = async (id) => {
         if (!user) return;
         try { 
@@ -321,6 +369,14 @@
         } catch (error) { showToast('刪除失敗', 'error'); }
       };
 
+      const handleDeletePackage = async (id) => {
+        if (!user) return;
+        try { 
+          await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('packages').doc(id).delete();
+          setSwipedPackageId(null); showToast('包裹已移除');
+        } catch (error) { showToast('刪除失敗', 'error'); }
+      };
+
       const handleEditClick = (item) => {
         setEditingId(item.id);
         setNewItem({ name: item.name, price: item.price.toString(), date: item.date, image: item.image, category: item.category || '其他' });
@@ -329,12 +385,24 @@
 
       const handleEditWishClick = (wish) => {
         setEditingWishId(wish.id);
-        setNewWish({ name: wish.name, price: wish.price.toString(), date: wish.date, image: wish.image, category: wish.category || '未到貨' });
+        setNewWish({ name: wish.name, price: wish.price.toString(), date: wish.date, image: wish.image, category: wish.category || '小卡' });
         setSwipedWishId(null); setIsWishModalOpen(true);
       };
 
+      const handleEditPackageClick = (pkg) => {
+        setEditingPackageId(pkg.id);
+        setNewPackage({ 
+          name: pkg.name, price: pkg.price.toString(), date: pkg.date, 
+          image: pkg.image, category: pkg.category || '未出貨',
+          orderNumber: pkg.orderNumber || '', seller: pkg.seller || '', 
+          buyer: pkg.buyer || '', website: pkg.website || ''
+        });
+        setSwipedPackageId(null); setIsPackageFormOpen(true);
+      };
+
       const closeItemModal = () => { setIsModalOpen(false); setEditingId(null); setNewItem({ name: '', price: '', date: todayStr, image: null, category: '小卡' }); };
-      const closeWishModal = () => { setIsWishModalOpen(false); setEditingWishId(null); setNewWish({ name: '', price: '', date: todayStr, image: null, category: '未到貨' }); };
+      const closeWishModal = () => { setIsWishModalOpen(false); setEditingWishId(null); setNewWish({ name: '', price: '', date: todayStr, image: null, category: '小卡' }); };
+      const closePackageModal = () => { setIsPackageFormOpen(false); setEditingPackageId(null); setNewPackage({ name: '', price: '', date: todayStr, image: null, category: '未出貨', orderNumber: '', seller: '', buyer: '', website: '' }); };
 
       const handleAddFund = async (e) => {
         e.preventDefault();
@@ -362,19 +430,27 @@
             if (diff > 50) setSwipedItemId(id); else if (diff < -50 && swipedItemId === id) setSwipedItemId(null);
         } else if (type === 'wish') {
             if (diff > 50) setSwipedWishId(id); else if (diff < -50 && swipedWishId === id) setSwipedWishId(null);
+        } else if (type === 'package') {
+            if (diff > 50) setSwipedPackageId(id); else if (diff < -50 && swipedPackageId === id) setSwipedPackageId(null);
         }
       };
 
-      // 財務計算
+      // === 過濾列表資料 ===
+      const filteredItems = activeCategory === '全部' ? items : items.filter(i => (i.category || '其他') === activeCategory);
+      const filteredWishes = activeWishCategory === '全部' ? wishes : wishes.filter(w => (w.category || '其他') === activeWishCategory);
+      const filteredPackages = activePackageCategory === '全部' ? packages : packages.filter(p => (p.category || '未出貨') === activePackageCategory);
+
+      // === 財務計算 (根據目前顯示的過濾結果動態加總) ===
       const formatCurrency = (val) => new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0 }).format(val || 0);
       const totalFunds = funds.reduce((sum, f) => sum + (Number(f.amount) || 0), 0);
       const totalSpent = items.reduce((sum, i) => sum + (Number(i.price) || 0), 0);
-      const totalWishAmount = wishes.reduce((sum, w) => sum + (Number(w.price) || 0), 0); 
+      
+      // 動態計算：只加總畫面上顯示的項目
+      const totalWishAmount = filteredWishes.reduce((sum, w) => sum + (Number(w.price) || 0), 0); 
+      const totalPackageAmount = filteredPackages.reduce((sum, p) => sum + (Number(p.price) || 0), 0); 
+      
       const balance = totalFunds - totalSpent;
       const displayNickname = profileData?.nickname || '專屬用戶';
-
-      const filteredItems = activeCategory === '全部' ? items : items.filter(i => (i.category || '其他') === activeCategory);
-      const filteredWishes = activeWishCategory === '全部' ? wishes : wishes.filter(w => (w.category || '其他') === activeWishCategory);
 
       // ==========================================
       // 畫面渲染
@@ -433,7 +509,7 @@
           </header>
 
           <main className="max-w-4xl mx-auto px-4 py-6 space-y-8">
-            {/* 看板卡片：已移除多餘的 border，確保區塊大小完美還原 */}
+            {/* 看板卡片 */}
             <div className="rounded-3xl p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden min-h-[220px] flex items-center group">
               {profileData?.dashboardBg ? (
                 <div className="absolute inset-0 bg-cover bg-center z-0 transition-transform duration-700 group-hover:scale-105" style={{ backgroundImage: `url(${profileData.dashboardBg})` }}><div className="absolute inset-0 bg-slate-900/30"></div></div>
@@ -442,25 +518,35 @@
               )}
               {(!profileData || !profileData.dashboardBg) && (<div className="absolute -right-8 -top-8 opacity-10 rotate-12 z-0"><i className="fa-solid fa-credit-card text-[180px]"></i></div>)}
               
-              <button 
-                onClick={() => setIsWishlistOpen(true)} 
-                className="absolute top-5 left-5 z-20 bg-black/10 hover:bg-black/20 backdrop-blur-sm border border-white/20 text-white px-3 py-1.5 rounded-full text-xs font-bold tracking-wider inline-flex items-center gap-1.5 transition-all shadow-sm"
-              >
-                <i className="fa-solid fa-star text-yellow-300 drop-shadow-sm"></i> <span className="drop-shadow-sm">許願池</span>
-              </button>
+              {/* === 修改：改成橫向排列，節省垂直空間，恢復卡片原始比例 === */}
+              <div className="absolute top-5 left-5 sm:top-6 sm:left-6 z-20 flex flex-row gap-2 items-center">
+                <button 
+                  onClick={() => setIsWishlistOpen(true)} 
+                  className="bg-black/10 hover:bg-black/20 backdrop-blur-md border border-white/20 text-white px-3 py-1.5 rounded-full text-xs font-bold tracking-wider inline-flex items-center gap-1.5 transition-all shadow-sm"
+                >
+                  <i className="fa-solid fa-star text-yellow-300 drop-shadow-sm"></i> <span className="drop-shadow-sm">許願池</span>
+                </button>
+                
+                <button 
+                  onClick={() => setIsPackageListOpen(true)} 
+                  className="bg-black/10 hover:bg-black/20 backdrop-blur-md border border-white/20 text-white px-3 py-1.5 rounded-full text-xs font-bold tracking-wider inline-flex items-center gap-1.5 transition-all shadow-sm"
+                >
+                  <i className="fa-solid fa-box-open text-orange-300 drop-shadow-sm"></i> <span className="drop-shadow-sm">待收包裹</span>
+                </button>
+              </div>
 
-              {/* 已移除多餘的 pt-2，完全還原排版尺寸 */}
+              {/* 拿掉之前增加高度的 pt-2，完全恢復原本的內部排版高度 */}
               <div className="relative z-10 w-full flex flex-col sm:flex-row justify-between items-end gap-6">
                 <div className="space-y-4">
-                  {profileData?.fandom && (<div className="bg-black/10 backdrop-blur-sm border border-white/20 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest inline-flex items-center gap-1.5 uppercase drop-shadow-sm"><i className="fa-solid fa-heart text-[10px]"></i> {profileData.fandom}</div>)}
+                  {profileData?.fandom && (<div className="bg-black/10 backdrop-blur-md border border-white/20 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest inline-flex items-center gap-1.5 uppercase drop-shadow-sm"><i className="fa-solid fa-heart text-[10px]"></i> {profileData.fandom}</div>)}
                   <div>
                     <h2 className="text-white drop-shadow-md text-xs font-medium mb-1 flex items-center gap-1.5"><i className="fa-solid fa-wallet"></i> 目前可用預算</h2>
                     <div className="text-4xl sm:text-5xl font-bold tracking-tight drop-shadow-lg">{formatCurrency(balance)}</div>
                   </div>
                 </div>
                 <div className="flex gap-3 w-full sm:w-auto">
-                  <button onClick={() => setIsFundModalOpen(true)} className="flex-1 bg-black/10 hover:bg-black/20 text-white px-5 py-3 rounded-2xl font-bold backdrop-blur-sm border border-white/20 flex items-center justify-center gap-2 transition-all drop-shadow-sm"><i className="fa-solid fa-piggy-bank"></i> 餵食</button>
-                  <button onClick={() => setIsFundHistoryOpen(true)} className="flex-1 bg-black/10 hover:bg-black/20 text-white px-5 py-3 rounded-2xl font-bold backdrop-blur-sm border border-white/20 flex items-center justify-center gap-2 transition-all drop-shadow-sm"><i className="fa-solid fa-clock-rotate-left"></i> 明細</button>
+                  <button onClick={() => setIsFundModalOpen(true)} className="flex-1 bg-black/10 hover:bg-black/20 text-white px-5 py-3 rounded-2xl font-bold backdrop-blur-md border border-white/20 flex items-center justify-center gap-2 transition-all drop-shadow-sm"><i className="fa-solid fa-piggy-bank"></i> 餵食</button>
+                  <button onClick={() => setIsFundHistoryOpen(true)} className="flex-1 bg-black/10 hover:bg-black/20 text-white px-5 py-3 rounded-2xl font-bold backdrop-blur-md border border-white/20 flex items-center justify-center gap-2 transition-all drop-shadow-sm"><i className="fa-solid fa-clock-rotate-left"></i> 明細</button>
                 </div>
               </div>
             </div>
@@ -577,10 +663,163 @@
             </div>
           )}
 
-          {/* Modal: 許願池主介面 (全屏或大視窗) */}
+          {/* ============================================================== */}
+          {/* Modal: 待收包裹 主介面 (動態計算金額) */}
+          {/* ============================================================== */}
+          {isPackageListOpen && (
+            <div className="fixed inset-0 z-[50] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full overflow-hidden">
+              <div className="bg-white px-4 py-3 sm:px-6 sm:py-4 shadow-sm border-b flex justify-between items-center sticky top-0 z-10">
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setIsPackageListOpen(false)} className="bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center hover:bg-slate-200 transition-colors">
+                    <i className="fa-solid fa-arrow-left text-slate-600"></i>
+                  </button>
+                  <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <i className="fa-solid fa-box-open text-orange-400"></i> 待收包裹
+                  </h2>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-slate-400 font-bold mb-0.5">包裹總金額</p>
+                  {/* 顯示動態加總的金額 */}
+                  <p className="text-xl sm:text-2xl font-black text-orange-500 tracking-tight">{formatCurrency(totalPackageAmount)}</p>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 max-w-4xl w-full mx-auto pb-24">
+                <div className="flex gap-2 overflow-x-auto scrollbar-hide mb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
+                  {['全部', ...PACKAGE_CATEGORIES].map(c => (
+                    <button key={c} onClick={() => setActivePackageCategory(c)} className={`whitespace-nowrap px-6 py-2.5 rounded-full text-sm font-bold transition-all shadow-sm ${activePackageCategory === c ? 'bg-orange-500 text-white shadow-orange-500/20' : 'bg-white text-slate-600 border border-slate-200'}`}>{c}</button>
+                  ))}
+                </div>
+
+                {filteredPackages.length === 0 ? (
+                  <div className="bg-white rounded-3xl p-8 text-center shadow-sm border border-slate-100 flex flex-col items-center justify-center min-h-[40vh]">
+                    <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mb-4"><i className="fa-solid fa-truck-fast text-3xl text-orange-300"></i></div>
+                    <p className="text-slate-600 font-bold text-lg">目前沒有包裹紀錄！</p>
+                    <p className="text-slate-400 text-sm mt-2 mb-6">又買了什麼好東西？快來記一筆</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {filteredPackages.map(pkg => (
+                      <div key={pkg.id} className="relative rounded-2xl overflow-hidden bg-white shadow-sm border border-slate-100 group">
+                        <div className="absolute inset-y-0 right-0 flex w-[120px]">
+                          <button onClick={() => handleEditPackageClick(pkg)} className="w-1/2 bg-blue-500 text-white flex items-center justify-center"><i className="fa-solid fa-pen-to-square text-lg"></i></button>
+                          <button onClick={() => handleDeletePackage(pkg.id)} className="w-1/2 bg-red-500 text-white flex items-center justify-center"><i className="fa-solid fa-trash-can text-lg"></i></button>
+                        </div>
+                        <div className={`relative z-10 bg-white w-full h-full transition-transform duration-300 ${swipedPackageId === pkg.id ? '-translate-x-[120px]' : ''}`} onTouchStart={handleTouchStart} onTouchMove={(e) => handleTouchMove(e, pkg.id, 'package')}>
+                          <div className="aspect-square bg-slate-50 relative overflow-hidden">
+                            {pkg.image ? <img src={pkg.image} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-200 bg-slate-100"><i className="fa-solid fa-box text-4xl"></i></div>}
+                            <div className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black uppercase backdrop-blur-sm shadow-sm
+                              ${pkg.category === '已到貨' ? 'bg-green-500/90 text-white' : 
+                                pkg.category === '已出貨' ? 'bg-blue-500/90 text-white' : 
+                                'bg-white/90 text-orange-600'}`
+                            }>
+                              {pkg.category}
+                            </div>
+                          </div>
+                          <div className="p-3">
+                            <h4 className="font-bold text-slate-800 text-sm line-clamp-1">{pkg.name}</h4>
+                            <div className="text-orange-500 font-black mt-1 mb-1">{formatCurrency(pkg.price)}</div>
+                            
+                            {(pkg.seller || pkg.orderNumber) && (
+                              <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
+                                {pkg.seller && <p className="text-[10px] text-slate-400 truncate" title={`賣家: ${pkg.seller}`}><i className="fa-solid fa-store w-3 text-slate-300"></i> {pkg.seller}</p>}
+                                {pkg.orderNumber && <p className="text-[10px] text-slate-400 truncate" title={`訂單: ${pkg.orderNumber}`}><i className="fa-solid fa-hashtag w-3 text-slate-300"></i> {pkg.orderNumber}</p>}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              <button onClick={() => { closePackageModal(); setIsPackageFormOpen(true); }} className="absolute bottom-6 right-6 z-[60] bg-orange-500 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center border-4 border-white transition-transform active:scale-90">
+                <i className="fa-solid fa-plus text-xl"></i>
+              </button>
+            </div>
+          )}
+
+          {/* Modal: 新增/編輯 包裹紀錄 */}
+          {isPackageFormOpen && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+              <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl animate-in zoom-in-95 max-h-[90vh] flex flex-col overflow-hidden">
+                <div className="flex justify-between items-center p-6 border-b shrink-0">
+                  <h3 className="text-xl font-bold flex items-center gap-2 text-orange-500">
+                    <i className={editingPackageId ? "fa-solid fa-pen-to-square" : "fa-solid fa-box-open"}></i> {editingPackageId ? '更新包裹狀態' : '新增包裹紀錄'}
+                  </h3>
+                  <button type="button" onClick={closePackageModal} disabled={isLoading} className="text-slate-400 hover:bg-slate-100 p-2 rounded-full"><i className="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                
+                <form onSubmit={handleSavePackage} className="p-6 overflow-y-auto space-y-4 scrollbar-hide">
+                  <div className="h-40 border-2 border-dashed rounded-2xl relative overflow-hidden flex items-center justify-center bg-slate-50 group shrink-0">
+                    <input type="file" onChange={handlePackageImageUpload} className="absolute inset-0 opacity-0 z-10 cursor-pointer" disabled={isLoading} />
+                    {newPackage.image ? (
+                      <img src={newPackage.image} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="text-center"><i className="fa-solid fa-image text-3xl text-slate-200 mx-auto"></i><p className="text-xs text-slate-400 mt-2">點擊上傳商品圖</p></div>
+                    )}
+                  </div>
+                  
+                  <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide shrink-0">
+                    {PACKAGE_CATEGORIES.map(c => (
+                      <button type="button" key={c} onClick={() => setNewPackage({...newPackage, category: c})} className={`px-5 py-2 rounded-full text-xs font-bold border transition-all ${newPackage.category === c ? 'bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/20' : 'bg-white text-slate-500'}`}>{c}</button>
+                    ))}
+                  </div>
+
+                  <input type="text" required value={newPackage.name} onChange={e => setNewPackage({...newPackage, name: e.target.value})} className="w-full p-4 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-orange-400 font-bold text-slate-700" placeholder="包裹內容物是什麼？" disabled={isLoading} />
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="relative min-w-0">
+                      <i className="fa-solid fa-dollar-sign absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                      <input type="number" required min="0" value={newPackage.price} onChange={e => setNewPackage({...newPackage, price: e.target.value})} className="w-full min-w-0 py-3.5 pl-8 pr-3 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-orange-400 font-bold" placeholder="金額" disabled={isLoading} />
+                    </div>
+                    <div className="relative min-w-0">
+                      <input type="date" value={newPackage.date} onChange={e => setNewPackage({...newPackage, date: e.target.value})} className="w-full min-w-0 px-3 py-3.5 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-orange-400 text-sm" disabled={isLoading} />
+                    </div>
+                  </div>
+
+                  <hr className="my-2 border-slate-100" />
+                  
+                  <h4 className="text-xs font-bold text-slate-400 px-1"><i className="fa-solid fa-circle-info"></i> 訂單詳細資訊 (選填)</h4>
+                  
+                  <div className="relative min-w-0">
+                    <i className="fa-solid fa-hashtag absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
+                    <input type="text" value={newPackage.orderNumber} onChange={e => setNewPackage({...newPackage, orderNumber: e.target.value})} className="w-full min-w-0 py-3.5 pl-10 pr-4 bg-white rounded-xl border outline-none focus:ring-2 focus:ring-orange-400 text-sm" placeholder="訂單號碼" disabled={isLoading} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="relative min-w-0">
+                      <i className="fa-solid fa-store absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
+                      <input type="text" value={newPackage.seller} onChange={e => setNewPackage({...newPackage, seller: e.target.value})} className="w-full min-w-0 py-3.5 pl-9 pr-3 bg-white rounded-xl border outline-none focus:ring-2 focus:ring-orange-400 text-sm" placeholder="賣家名稱" disabled={isLoading} />
+                    </div>
+                    <div className="relative min-w-0">
+                      <i className="fa-solid fa-user absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
+                      <input type="text" value={newPackage.buyer} onChange={e => setNewPackage({...newPackage, buyer: e.target.value})} className="w-full min-w-0 py-3.5 pl-9 pr-3 bg-white rounded-xl border outline-none focus:ring-2 focus:ring-orange-400 text-sm" placeholder="買家 (跟誰代購)" disabled={isLoading} />
+                    </div>
+                  </div>
+
+                  <div className="relative min-w-0 pb-2">
+                    <i className="fa-solid fa-globe absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
+                    <input type="text" value={newPackage.website} onChange={e => setNewPackage({...newPackage, website: e.target.value})} className="w-full min-w-0 py-3.5 pl-10 pr-4 bg-white rounded-xl border outline-none focus:ring-2 focus:ring-orange-400 text-sm" placeholder="購買網站 (例如: 蝦皮、微店)" disabled={isLoading} />
+                  </div>
+                  
+                  <div className="pt-2 flex gap-3 sticky bottom-0 bg-white">
+                    <button type="button" onClick={closePackageModal} disabled={isLoading} className="flex-1 bg-slate-100 text-slate-500 py-4 rounded-2xl font-bold">取消</button>
+                    <button type="submit" disabled={isLoading} className="flex-[2] bg-orange-500 text-white py-4 rounded-2xl font-bold shadow-lg shadow-orange-500/20 transition-transform active:scale-95 flex justify-center items-center">
+                      {isLoading ? <i className="fa-solid fa-spinner fa-spin"></i> : '儲存包裹'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ============================================================== */}
+          {/* Modal: 許願池主介面 (動態計算金額) */}
+          {/* ============================================================== */}
           {isWishlistOpen && (
             <div className="fixed inset-0 z-[50] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full overflow-hidden">
-              {/* 許願池頭部 */}
               <div className="bg-white px-4 py-3 sm:px-6 sm:py-4 shadow-sm border-b flex justify-between items-center sticky top-0 z-10">
                 <div className="flex items-center gap-3">
                   <button onClick={() => setIsWishlistOpen(false)} className="bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center hover:bg-slate-200 transition-colors">
@@ -592,14 +831,14 @@
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-slate-400 font-bold mb-0.5">總需金額</p>
+                  {/* 顯示動態加總的金額 */}
                   <p className="text-xl sm:text-2xl font-black text-yellow-500 tracking-tight">{formatCurrency(totalWishAmount)}</p>
                 </div>
               </div>
 
-              {/* 許願池內容區 */}
               <div className="flex-1 overflow-y-auto p-4 max-w-4xl w-full mx-auto pb-24">
                 <div className="flex gap-2 overflow-x-auto scrollbar-hide mb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
-                  {['全部', ...WISH_CATEGORIES].map(c => (
+                  {['全部', ...CATEGORIES].map(c => (
                     <button key={c} onClick={() => setActiveWishCategory(c)} className={`whitespace-nowrap px-6 py-2.5 rounded-full text-sm font-bold transition-all shadow-sm ${activeWishCategory === c ? 'bg-yellow-500 text-white shadow-yellow-500/20' : 'bg-white text-slate-600 border border-slate-200'}`}>{c}</button>
                   ))}
                 </div>
@@ -622,7 +861,6 @@
                           <div className="aspect-square bg-slate-50 relative overflow-hidden">
                             {wish.image ? <img src={wish.image} className="w-full h-full object-cover opacity-80" /> : <div className="w-full h-full flex items-center justify-center text-slate-200 bg-slate-100"><i className="fa-solid fa-gift text-4xl"></i></div>}
                             <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-black text-yellow-600 uppercase">{wish.category}</div>
-                            {/* 加上一個許願的小標記 */}
                             <div className="absolute bottom-2 right-2 bg-yellow-400/90 backdrop-blur-sm text-white w-6 h-6 rounded-full flex items-center justify-center shadow-sm"><i className="fa-solid fa-star text-[10px]"></i></div>
                           </div>
                           <div className="p-3">
@@ -636,7 +874,6 @@
                 )}
               </div>
               
-              {/* 許願池專屬浮動新增按鈕 */}
               <button onClick={() => { closeWishModal(); setIsWishModalOpen(true); }} className="absolute bottom-6 right-6 z-[60] bg-yellow-400 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center border-4 border-white transition-transform active:scale-90">
                 <i className="fa-solid fa-plus text-xl"></i>
               </button>
@@ -663,7 +900,7 @@
                     )}
                   </div>
                   <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                    {WISH_CATEGORIES.map(c => (
+                    {CATEGORIES.map(c => (
                       <button type="button" key={c} onClick={() => setNewWish({...newWish, category: c})} className={`px-5 py-2 rounded-full text-xs font-bold border transition-all ${newWish.category === c ? 'bg-yellow-500 text-white border-yellow-500 shadow-md shadow-yellow-500/20' : 'bg-white text-slate-500'}`}>{c}</button>
                     ))}
                   </div>
