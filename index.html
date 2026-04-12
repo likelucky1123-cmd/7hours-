@@ -452,18 +452,21 @@
         }
       };
 
-      // 財務計算
-      const formatCurrency = (val) => new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0 }).format(val || 0);
-      const totalFunds = funds.reduce((sum, f) => sum + (Number(f.amount) || 0), 0);
-      const totalSpent = items.reduce((sum, i) => sum + (Number(i.price) || 0), 0);
-      const totalWishAmount = wishes.reduce((sum, w) => sum + (Number(w.price) || 0), 0); 
-      const totalPackageAmount = packages.reduce((sum, p) => sum + (Number(p.price) || 0), 0); 
-      const balance = totalFunds - totalSpent;
-      const displayNickname = profileData?.nickname || '專屬用戶';
-
+      // === 過濾邏輯 ===
       const filteredItems = activeCategory === '全部' ? items : items.filter(i => (i.category || '其他') === activeCategory);
       const filteredWishes = activeWishCategory === '全部' ? wishes : wishes.filter(w => (w.category || '其他') === activeWishCategory);
       const filteredPackages = activePackageCategory === '全部' ? packages : packages.filter(p => (p.category || '未出貨') === activePackageCategory);
+
+      // === 財務計算 (修改：許願與包裹的總額依據過濾後的列表計算) ===
+      const formatCurrency = (val) => new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0 }).format(val || 0);
+      const totalFunds = funds.reduce((sum, f) => sum + (Number(f.amount) || 0), 0);
+      const totalSpent = items.reduce((sum, i) => sum + (Number(i.price) || 0), 0);
+      
+      const totalWishAmount = filteredWishes.reduce((sum, w) => sum + (Number(w.price) || 0), 0); 
+      const totalPackageAmount = filteredPackages.reduce((sum, p) => sum + (Number(p.price) || 0), 0); 
+      
+      const balance = totalFunds - totalSpent;
+      const displayNickname = profileData?.nickname || '專屬用戶';
 
       // ==========================================
       // 畫面渲染
@@ -540,8 +543,7 @@
           </header>
 
           <main className="max-w-4xl mx-auto px-4 py-6 space-y-8">
-            {/* === 修改：去除 pt-2 與多餘 border，恢復完美原始大小 === */}
-            <div className="rounded-3xl p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden min-h-[220px] flex items-center group">
+            <div className="rounded-3xl p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden min-h-[220px] flex items-center group border border-slate-200">
               {profileData?.dashboardBg ? (
                 <div className="absolute inset-0 bg-cover bg-center z-0 transition-transform duration-700 group-hover:scale-105" style={{ backgroundImage: `url(${profileData.dashboardBg})` }}><div className="absolute inset-0 bg-slate-900/30"></div></div>
               ) : (
@@ -549,7 +551,6 @@
               )}
               {(!profileData || !profileData.dashboardBg) && (<div className="absolute -right-8 -top-8 opacity-10 rotate-12 z-0"><i className="fa-solid fa-credit-card text-[180px]"></i></div>)}
               
-              {/* === 完美解法：改用 flex-row (左右並排) 絕對不會佔用下方空間 === */}
               <div className="absolute top-5 left-5 z-20 flex gap-2 items-center">
                 <button 
                   onClick={() => setIsWishlistOpen(true)} 
@@ -565,7 +566,6 @@
                 </button>
               </div>
 
-              {/* === 恢復原始的內部排版，完全無多餘 padding === */}
               <div className="relative z-10 w-full flex flex-col sm:flex-row justify-between items-end gap-6">
                 <div className="space-y-4">
                   {profileData?.fandom && (<div className="bg-black/10 backdrop-blur-md border border-white/20 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest inline-flex items-center gap-1.5 uppercase drop-shadow-sm"><i className="fa-solid fa-heart text-[10px]"></i> {profileData.fandom}</div>)}
@@ -708,7 +708,10 @@
                   </h2>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-slate-400 font-bold mb-0.5">包裹總金額</p>
+                  {/* === 修改：動態變更標題文字 === */}
+                  <p className="text-xs text-slate-400 font-bold mb-0.5">
+                    {activePackageCategory === '全部' ? '包裹總金額' : `${activePackageCategory}總額`}
+                  </p>
                   <p className="text-xl sm:text-2xl font-black text-orange-500 tracking-tight">{formatCurrency(totalPackageAmount)}</p>
                 </div>
               </div>
@@ -859,7 +862,10 @@
                   </h2>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-slate-400 font-bold mb-0.5">總需金額</p>
+                  {/* === 修改：動態變更標題文字 === */}
+                  <p className="text-xs text-slate-400 font-bold mb-0.5">
+                    {activeWishCategory === '全部' ? '總需金額' : `${activeWishCategory}總計`}
+                  </p>
                   <p className="text-xl sm:text-2xl font-black text-yellow-500 tracking-tight">{formatCurrency(totalWishAmount)}</p>
                 </div>
               </div>
@@ -1065,4 +1071,5 @@
   </script>
 </body>
 </html>
+
 
