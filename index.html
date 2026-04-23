@@ -105,6 +105,8 @@
       
       // 自訂確認刪除彈窗狀態
       const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, message: '', onConfirm: null });
+      // === 新增：照片放大預覽狀態 ===
+      const [previewImage, setPreviewImage] = useState(null);
 
       const [editingId, setEditingId] = useState(null); 
       const [editingWishId, setEditingWishId] = useState(null); 
@@ -457,7 +459,7 @@
       const filteredWishes = activeWishCategory === '全部' ? wishes : wishes.filter(w => (w.category || '其他') === activeWishCategory);
       const filteredPackages = activePackageCategory === '全部' ? packages : packages.filter(p => (p.category || '未出貨') === activePackageCategory);
 
-      // === 財務計算 (修改：許願與包裹的總額依據過濾後的列表計算) ===
+      // === 財務計算 ===
       const formatCurrency = (val) => new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0 }).format(val || 0);
       const totalFunds = funds.reduce((sum, f) => sum + (Number(f.amount) || 0), 0);
       const totalSpent = items.reduce((sum, i) => sum + (Number(i.price) || 0), 0);
@@ -543,6 +545,7 @@
           </header>
 
           <main className="max-w-4xl mx-auto px-4 py-6 space-y-8">
+            {/* 看板卡片 */}
             <div className="rounded-3xl p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden min-h-[220px] flex items-center group border border-slate-200">
               {profileData?.dashboardBg ? (
                 <div className="absolute inset-0 bg-cover bg-center z-0 transition-transform duration-700 group-hover:scale-105" style={{ backgroundImage: `url(${profileData.dashboardBg})` }}><div className="absolute inset-0 bg-slate-900/30"></div></div>
@@ -621,8 +624,17 @@
                       </div>
                       <div className={`relative z-10 bg-white w-full h-full transition-transform duration-300 ${swipedItemId === item.id ? '-translate-x-[120px]' : ''}`} onTouchStart={handleTouchStart} onTouchMove={(e) => handleTouchMove(e, item.id, 'item')}>
                         <div className="aspect-square bg-slate-50 relative overflow-hidden">
-                          {item.image ? <img src={item.image} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-200"><i className="fa-solid fa-image text-4xl"></i></div>}
-                          <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-black text-yellow-600 uppercase">{item.category}</div>
+                          {/* === 修改：加入點擊放大功能 === */}
+                          {item.image ? (
+                            <img 
+                              src={item.image} 
+                              className="w-full h-full object-cover cursor-pointer" 
+                              onClick={() => setPreviewImage(item.image)}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-200"><i className="fa-solid fa-image text-4xl"></i></div>
+                          )}
+                          <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-black text-yellow-600 uppercase pointer-events-none">{item.category}</div>
                         </div>
                         <div className="p-3">
                           <h4 className="font-bold text-slate-800 text-sm line-clamp-1">{item.name}</h4>
@@ -708,7 +720,6 @@
                   </h2>
                 </div>
                 <div className="text-right">
-                  {/* === 修改：動態變更標題文字 === */}
                   <p className="text-xs text-slate-400 font-bold mb-0.5">
                     {activePackageCategory === '全部' ? '包裹總金額' : `${activePackageCategory}總額`}
                   </p>
@@ -739,8 +750,17 @@
                         </div>
                         <div className={`relative z-10 bg-white w-full h-full transition-transform duration-300 ${swipedPackageId === pkg.id ? '-translate-x-[120px]' : ''}`} onTouchStart={handleTouchStart} onTouchMove={(e) => handleTouchMove(e, pkg.id, 'package')}>
                           <div className="aspect-square bg-slate-50 relative overflow-hidden">
-                            {pkg.image ? <img src={pkg.image} className="w-full h-full object-cover opacity-90" /> : <div className="w-full h-full flex items-center justify-center text-slate-200 bg-slate-100"><i className="fa-solid fa-box text-4xl"></i></div>}
-                            <div className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black uppercase backdrop-blur-sm shadow-sm
+                            {/* === 修改：加入點擊放大功能 === */}
+                            {pkg.image ? (
+                              <img 
+                                src={pkg.image} 
+                                className="w-full h-full object-cover opacity-90 cursor-pointer" 
+                                onClick={() => setPreviewImage(pkg.image)}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-200 bg-slate-100"><i className="fa-solid fa-box text-4xl"></i></div>
+                            )}
+                            <div className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black uppercase backdrop-blur-sm shadow-sm pointer-events-none
                               ${pkg.category === '已到貨' ? 'bg-green-500/90 text-white' : 
                                 pkg.category === '已出貨' ? 'bg-blue-500/90 text-white' : 
                                 'bg-white/90 text-orange-600'}`
@@ -862,7 +882,6 @@
                   </h2>
                 </div>
                 <div className="text-right">
-                  {/* === 修改：動態變更標題文字 === */}
                   <p className="text-xs text-slate-400 font-bold mb-0.5">
                     {activeWishCategory === '全部' ? '總需金額' : `${activeWishCategory}總計`}
                   </p>
@@ -893,9 +912,18 @@
                         </div>
                         <div className={`relative z-10 bg-white w-full h-full transition-transform duration-300 ${swipedWishId === wish.id ? '-translate-x-[120px]' : ''}`} onTouchStart={handleTouchStart} onTouchMove={(e) => handleTouchMove(e, wish.id, 'wish')}>
                           <div className="aspect-square bg-slate-50 relative overflow-hidden">
-                            {wish.image ? <img src={wish.image} className="w-full h-full object-cover opacity-80" /> : <div className="w-full h-full flex items-center justify-center text-slate-200 bg-slate-100"><i className="fa-solid fa-gift text-4xl"></i></div>}
-                            <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-black text-yellow-600 uppercase">{wish.category}</div>
-                            <div className="absolute bottom-2 right-2 bg-yellow-400/90 backdrop-blur-sm text-white w-6 h-6 rounded-full flex items-center justify-center shadow-sm"><i className="fa-solid fa-star text-[10px]"></i></div>
+                            {/* === 修改：加入點擊放大功能 === */}
+                            {wish.image ? (
+                              <img 
+                                src={wish.image} 
+                                className="w-full h-full object-cover opacity-80 cursor-pointer" 
+                                onClick={() => setPreviewImage(wish.image)}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-200 bg-slate-100"><i className="fa-solid fa-gift text-4xl"></i></div>
+                            )}
+                            <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-black text-yellow-600 uppercase pointer-events-none">{wish.category}</div>
+                            <div className="absolute bottom-2 right-2 bg-yellow-400/90 backdrop-blur-sm text-white w-6 h-6 rounded-full flex items-center justify-center shadow-sm pointer-events-none"><i className="fa-solid fa-star text-[10px]"></i></div>
                           </div>
                           <div className="p-3">
                             <h4 className="font-bold text-slate-800 text-sm line-clamp-1">{wish.name}</h4>
@@ -1062,6 +1090,27 @@
               </div>
             </div>
           )}
+
+          {/* === 新增：圖片放大預覽 Modal === */}
+          {previewImage && (
+            <div 
+              className="fixed inset-0 z-[120] flex items-center justify-center bg-black/90 backdrop-blur-sm animate-in fade-in duration-200 p-4"
+              onClick={() => setPreviewImage(null)}
+            >
+              <button 
+                className="absolute top-6 right-6 text-white bg-white/20 hover:bg-white/40 rounded-full w-10 h-10 flex items-center justify-center transition-colors z-10"
+                onClick={(e) => { e.stopPropagation(); setPreviewImage(null); }}
+              >
+                <i className="fa-solid fa-xmark text-xl"></i>
+              </button>
+              <img 
+                src={previewImage} 
+                className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
+                onClick={(e) => e.stopPropagation()} 
+              />
+            </div>
+          )}
+
         </div>
       );
     }
