@@ -32,6 +32,8 @@
     input[type="date"] {
       -webkit-appearance: none;
       min-width: 0;
+      width: 100%;
+      box-sizing: border-box;
     }
   </style>
 </head>
@@ -71,7 +73,7 @@
 
     const { useState, useEffect, useRef } = React;
     const CATEGORIES = ['小卡', '專輯', '娃娃', '野周', '其他'];
-    const PACKAGE_CATEGORIES = ['未出貨', '已出貨', '已到貨']; 
+    const PACKAGE_CATEGORIES = ['預購', '未出貨', '已出貨', '已到貨']; 
 
     function App() {
       // === 狀態管理 ===
@@ -103,10 +105,11 @@
       const [isPackageListOpen, setIsPackageListOpen] = useState(false); 
       const [isPackageFormOpen, setIsPackageFormOpen] = useState(false); 
       
+      // === 新增：放大圖片狀態 ===
+      const [enlargedImage, setEnlargedImage] = useState(null);
+
       // 自訂確認刪除彈窗狀態
       const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, message: '', onConfirm: null });
-      // === 新增：照片放大預覽狀態 ===
-      const [previewImage, setPreviewImage] = useState(null);
 
       const [editingId, setEditingId] = useState(null); 
       const [editingWishId, setEditingWishId] = useState(null); 
@@ -508,11 +511,9 @@
         );
       }
 
-      // 已登入狀態 - 主畫面
       return (
         <div className="min-h-screen bg-slate-50 text-slate-800 pb-24 overflow-x-hidden relative">
           
-          {/* === 自訂確認刪除彈窗 === */}
           {confirmDialog.isOpen && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
               <div className="bg-white rounded-3xl w-full max-w-xs p-6 shadow-2xl animate-in zoom-in-95 flex flex-col items-center text-center">
@@ -529,7 +530,6 @@
             </div>
           )}
 
-          {/* Toast 提示 */}
           {toastMessage && (
             <div className={`fixed top-10 left-1/2 -translate-x-1/2 z-[110] px-6 py-3 rounded-full shadow-lg flex items-center gap-2 animate-in slide-in-from-top-4 text-sm ${toastType === 'error' ? 'bg-red-600 text-white' : 'bg-slate-800 text-white'}`}>
               {toastType === 'error' ? <i className="fa-solid fa-circle-exclamation"></i> : <i className="fa-solid fa-circle-check text-green-400"></i>}{toastMessage}
@@ -545,7 +545,8 @@
           </header>
 
           <main className="max-w-4xl mx-auto px-4 py-6 space-y-8">
-            {/* 看板卡片 */}
+            
+            {/* 預算卡片：完全保留前次滿意佈局 */}
             <div className="rounded-3xl p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden min-h-[220px] flex items-center group border border-slate-200">
               {profileData?.dashboardBg ? (
                 <div className="absolute inset-0 bg-cover bg-center z-0 transition-transform duration-700 group-hover:scale-105" style={{ backgroundImage: `url(${profileData.dashboardBg})` }}><div className="absolute inset-0 bg-slate-900/30"></div></div>
@@ -570,10 +571,11 @@
               </div>
 
               <div className="relative z-10 w-full flex flex-col sm:flex-row justify-between items-end gap-6">
-                <div className="space-y-4">
+                {/* 完美靠右對齊的內容區塊 */}
+                <div className="space-y-4 w-full flex flex-col items-end text-right">
                   {profileData?.fandom && (<div className="bg-black/10 backdrop-blur-md border border-white/20 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest inline-flex items-center gap-1.5 uppercase drop-shadow-sm"><i className="fa-solid fa-heart text-[10px]"></i> {profileData.fandom}</div>)}
-                  <div>
-                    <h2 className="text-white drop-shadow-md text-xs font-medium mb-1 flex items-center gap-1.5"><i className="fa-solid fa-wallet"></i> 目前可用預算</h2>
+                  <div className="w-full">
+                    <h2 className="text-white drop-shadow-md text-xs font-medium mb-1 flex items-center justify-end gap-1.5"><i className="fa-solid fa-wallet"></i> 目前可用預算</h2>
                     <div className="text-4xl sm:text-5xl font-bold tracking-tight drop-shadow-lg">{formatCurrency(balance)}</div>
                   </div>
                 </div>
@@ -624,17 +626,9 @@
                       </div>
                       <div className={`relative z-10 bg-white w-full h-full transition-transform duration-300 ${swipedItemId === item.id ? '-translate-x-[120px]' : ''}`} onTouchStart={handleTouchStart} onTouchMove={(e) => handleTouchMove(e, item.id, 'item')}>
                         <div className="aspect-square bg-slate-50 relative overflow-hidden">
-                          {/* === 修改：加入點擊放大功能 === */}
-                          {item.image ? (
-                            <img 
-                              src={item.image} 
-                              className="w-full h-full object-cover cursor-pointer" 
-                              onClick={() => setPreviewImage(item.image)}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-slate-200"><i className="fa-solid fa-image text-4xl"></i></div>
-                          )}
-                          <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-black text-yellow-600 uppercase pointer-events-none">{item.category}</div>
+                          {/* === 修改：加入點擊放大 === */}
+                          {item.image ? <img src={item.image} onClick={() => setEnlargedImage(item.image)} className="w-full h-full object-cover cursor-pointer" /> : <div className="w-full h-full flex items-center justify-center text-slate-200"><i className="fa-solid fa-image text-4xl"></i></div>}
+                          <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-black text-yellow-600 uppercase">{item.category}</div>
                         </div>
                         <div className="p-3">
                           <h4 className="font-bold text-slate-800 text-sm line-clamp-1">{item.name}</h4>
@@ -648,7 +642,7 @@
             </div>
           </main>
 
-          <button onClick={() => { closeItemModal(); setIsModalOpen(true); }} className="fixed bottom-6 right-6 z-30 bg-yellow-500 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center border-4 border-white transition-transform active:scale-90">
+          <button onClick={() => { closeItemModal(); setIsModalOpen(true); }} className="absolute bottom-6 right-6 z-30 bg-yellow-500 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center border-4 border-white transition-transform active:scale-90">
             <i className="fa-solid fa-plus text-xl"></i>
           </button>
 
@@ -705,9 +699,7 @@
             </div>
           )}
 
-          {/* ============================================================== */}
           {/* Modal: 待收包裹 主介面 */}
-          {/* ============================================================== */}
           {isPackageListOpen && (
             <div className="fixed inset-0 z-[50] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full overflow-hidden">
               <div className="bg-white px-4 py-3 sm:px-6 sm:py-4 shadow-sm border-b flex justify-between items-center sticky top-0 z-10">
@@ -750,17 +742,9 @@
                         </div>
                         <div className={`relative z-10 bg-white w-full h-full transition-transform duration-300 ${swipedPackageId === pkg.id ? '-translate-x-[120px]' : ''}`} onTouchStart={handleTouchStart} onTouchMove={(e) => handleTouchMove(e, pkg.id, 'package')}>
                           <div className="aspect-square bg-slate-50 relative overflow-hidden">
-                            {/* === 修改：加入點擊放大功能 === */}
-                            {pkg.image ? (
-                              <img 
-                                src={pkg.image} 
-                                className="w-full h-full object-cover opacity-90 cursor-pointer" 
-                                onClick={() => setPreviewImage(pkg.image)}
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-slate-200 bg-slate-100"><i className="fa-solid fa-box text-4xl"></i></div>
-                            )}
-                            <div className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black uppercase backdrop-blur-sm shadow-sm pointer-events-none
+                            {/* === 修改：加入點擊放大 === */}
+                            {pkg.image ? <img src={pkg.image} onClick={() => setEnlargedImage(pkg.image)} className="w-full h-full object-cover opacity-90 cursor-pointer" /> : <div className="w-full h-full flex items-center justify-center text-slate-200 bg-slate-100"><i className="fa-solid fa-box text-4xl"></i></div>}
+                            <div className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black uppercase backdrop-blur-sm shadow-sm
                               ${pkg.category === '已到貨' ? 'bg-green-500/90 text-white' : 
                                 pkg.category === '已出貨' ? 'bg-blue-500/90 text-white' : 
                                 'bg-white/90 text-orange-600'}`
@@ -821,13 +805,13 @@
 
                   <input type="text" required value={newPackage.name} onChange={e => setNewPackage({...newPackage, name: e.target.value})} className="w-full p-4 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-orange-400 font-bold text-slate-700" placeholder="包裹內容物是什麼？" disabled={isLoading} />
                   
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="relative min-w-0">
+                  <div className="grid grid-cols-2 gap-3 w-full">
+                    <div className="relative w-full overflow-hidden rounded-xl">
                       <i className="fa-solid fa-dollar-sign absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                      <input type="number" required min="0" value={newPackage.price} onChange={e => setNewPackage({...newPackage, price: e.target.value})} className="w-full min-w-0 py-3.5 pl-8 pr-3 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-orange-400 font-bold" placeholder="金額" disabled={isLoading} />
+                      <input type="number" required min="0" value={newPackage.price} onChange={e => setNewPackage({...newPackage, price: e.target.value})} className="w-full box-border py-3.5 pl-8 pr-3 bg-slate-50 outline-none focus:ring-2 focus:ring-orange-400 font-bold" placeholder="金額" disabled={isLoading} />
                     </div>
-                    <div className="relative min-w-0">
-                      <input type="date" value={newPackage.date} onChange={e => setNewPackage({...newPackage, date: e.target.value})} className="w-full min-w-0 px-3 py-3.5 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-orange-400 text-sm" disabled={isLoading} />
+                    <div className="relative w-full overflow-hidden rounded-xl">
+                      <input type="date" value={newPackage.date} onChange={e => setNewPackage({...newPackage, date: e.target.value})} className="w-full box-border px-3 py-3.5 bg-slate-50 outline-none focus:ring-2 focus:ring-orange-400 text-sm" disabled={isLoading} />
                     </div>
                   </div>
 
@@ -835,25 +819,25 @@
                   
                   <h4 className="text-xs font-bold text-slate-400 px-1"><i className="fa-solid fa-circle-info"></i> 訂單詳細資訊 (選填)</h4>
                   
-                  <div className="relative min-w-0">
+                  <div className="relative w-full overflow-hidden rounded-xl border">
                     <i className="fa-solid fa-hashtag absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
-                    <input type="text" value={newPackage.orderNumber} onChange={e => setNewPackage({...newPackage, orderNumber: e.target.value})} className="w-full min-w-0 py-3.5 pl-10 pr-4 bg-white rounded-xl border outline-none focus:ring-2 focus:ring-orange-400 text-sm" placeholder="訂單號碼" disabled={isLoading} />
+                    <input type="text" value={newPackage.orderNumber} onChange={e => setNewPackage({...newPackage, orderNumber: e.target.value})} className="w-full box-border py-3.5 pl-10 pr-4 bg-white outline-none focus:ring-2 focus:ring-orange-400 text-sm" placeholder="訂單號碼" disabled={isLoading} />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="relative min-w-0">
+                  <div className="grid grid-cols-2 gap-3 w-full">
+                    <div className="relative w-full overflow-hidden rounded-xl border">
                       <i className="fa-solid fa-store absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
-                      <input type="text" value={newPackage.seller} onChange={e => setNewPackage({...newPackage, seller: e.target.value})} className="w-full min-w-0 py-3.5 pl-9 pr-3 bg-white rounded-xl border outline-none focus:ring-2 focus:ring-orange-400 text-sm" placeholder="賣家名稱" disabled={isLoading} />
+                      <input type="text" value={newPackage.seller} onChange={e => setNewPackage({...newPackage, seller: e.target.value})} className="w-full box-border py-3.5 pl-9 pr-3 bg-white outline-none focus:ring-2 focus:ring-orange-400 text-sm" placeholder="賣家名稱" disabled={isLoading} />
                     </div>
-                    <div className="relative min-w-0">
+                    <div className="relative w-full overflow-hidden rounded-xl border">
                       <i className="fa-solid fa-user absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
-                      <input type="text" value={newPackage.buyer} onChange={e => setNewPackage({...newPackage, buyer: e.target.value})} className="w-full min-w-0 py-3.5 pl-9 pr-3 bg-white rounded-xl border outline-none focus:ring-2 focus:ring-orange-400 text-sm" placeholder="買家 (代購)" disabled={isLoading} />
+                      <input type="text" value={newPackage.buyer} onChange={e => setNewPackage({...newPackage, buyer: e.target.value})} className="w-full box-border py-3.5 pl-9 pr-3 bg-white outline-none focus:ring-2 focus:ring-orange-400 text-sm" placeholder="買家 (代購)" disabled={isLoading} />
                     </div>
                   </div>
 
-                  <div className="relative min-w-0 pb-2">
+                  <div className="relative w-full overflow-hidden rounded-xl border pb-2 mb-2">
                     <i className="fa-solid fa-globe absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-sm"></i>
-                    <input type="text" value={newPackage.website} onChange={e => setNewPackage({...newPackage, website: e.target.value})} className="w-full min-w-0 py-3.5 pl-10 pr-4 bg-white rounded-xl border outline-none focus:ring-2 focus:ring-orange-400 text-sm" placeholder="購買網站 (如: 蝦皮、微店)" disabled={isLoading} />
+                    <input type="text" value={newPackage.website} onChange={e => setNewPackage({...newPackage, website: e.target.value})} className="w-full box-border py-3.5 pl-10 pr-4 bg-white outline-none focus:ring-2 focus:ring-orange-400 text-sm" placeholder="購買網站 (如: 蝦皮、微店)" disabled={isLoading} />
                   </div>
                   
                   <div className="pt-2 flex gap-3 sticky bottom-0 bg-white">
@@ -867,9 +851,7 @@
             </div>
           )}
 
-          {/* ============================================================== */}
           {/* Modal: 許願池主介面 */}
-          {/* ============================================================== */}
           {isWishlistOpen && (
             <div className="fixed inset-0 z-[50] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full overflow-hidden">
               <div className="bg-white px-4 py-3 sm:px-6 sm:py-4 shadow-sm border-b flex justify-between items-center sticky top-0 z-10">
@@ -912,18 +894,10 @@
                         </div>
                         <div className={`relative z-10 bg-white w-full h-full transition-transform duration-300 ${swipedWishId === wish.id ? '-translate-x-[120px]' : ''}`} onTouchStart={handleTouchStart} onTouchMove={(e) => handleTouchMove(e, wish.id, 'wish')}>
                           <div className="aspect-square bg-slate-50 relative overflow-hidden">
-                            {/* === 修改：加入點擊放大功能 === */}
-                            {wish.image ? (
-                              <img 
-                                src={wish.image} 
-                                className="w-full h-full object-cover opacity-80 cursor-pointer" 
-                                onClick={() => setPreviewImage(wish.image)}
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-slate-200 bg-slate-100"><i className="fa-solid fa-gift text-4xl"></i></div>
-                            )}
-                            <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-black text-yellow-600 uppercase pointer-events-none">{wish.category}</div>
-                            <div className="absolute bottom-2 right-2 bg-yellow-400/90 backdrop-blur-sm text-white w-6 h-6 rounded-full flex items-center justify-center shadow-sm pointer-events-none"><i className="fa-solid fa-star text-[10px]"></i></div>
+                            {/* === 修改：加入點擊放大 === */}
+                            {wish.image ? <img src={wish.image} onClick={() => setEnlargedImage(wish.image)} className="w-full h-full object-cover opacity-80 cursor-pointer" /> : <div className="w-full h-full flex items-center justify-center text-slate-200 bg-slate-100"><i className="fa-solid fa-gift text-4xl"></i></div>}
+                            <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-black text-yellow-600 uppercase">{wish.category}</div>
+                            <div className="absolute bottom-2 right-2 bg-yellow-400/90 backdrop-blur-sm text-white w-6 h-6 rounded-full flex items-center justify-center shadow-sm"><i className="fa-solid fa-star text-[10px]"></i></div>
                           </div>
                           <div className="p-3">
                             <h4 className="font-bold text-slate-800 text-sm line-clamp-1">{wish.name}</h4>
@@ -968,13 +942,13 @@
                   </div>
                   <input type="text" required value={newWish.name} onChange={e => setNewWish({...newWish, name: e.target.value})} className="w-full p-4 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400" placeholder="想要什麼酷東西？" disabled={isLoading} />
                   
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="relative min-w-0">
+                  <div className="grid grid-cols-2 gap-3 w-full">
+                    <div className="relative w-full overflow-hidden rounded-xl">
                       <i className="fa-solid fa-dollar-sign absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                      <input type="number" required min="0" value={newWish.price} onChange={e => setNewWish({...newWish, price: e.target.value})} className="w-full min-w-0 py-3.5 pl-8 pr-3 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400 font-bold" placeholder="目標金額" disabled={isLoading} />
+                      <input type="number" required min="0" value={newWish.price} onChange={e => setNewWish({...newWish, price: e.target.value})} className="w-full box-border py-3.5 pl-8 pr-3 bg-slate-50 outline-none focus:ring-2 focus:ring-yellow-400 font-bold" placeholder="目標金額" disabled={isLoading} />
                     </div>
-                    <div className="relative min-w-0">
-                      <input type="date" value={newWish.date} onChange={e => setNewWish({...newWish, date: e.target.value})} className="w-full min-w-0 px-3 py-3.5 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400 text-sm" disabled={isLoading} />
+                    <div className="relative w-full overflow-hidden rounded-xl">
+                      <input type="date" value={newWish.date} onChange={e => setNewWish({...newWish, date: e.target.value})} className="w-full box-border px-3 py-3.5 bg-slate-50 outline-none focus:ring-2 focus:ring-yellow-400 text-sm" disabled={isLoading} />
                     </div>
                   </div>
                   
@@ -1015,12 +989,12 @@
                   </div>
                   <input type="text" required value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="w-full p-4 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400" placeholder="買了什麼？" disabled={isLoading} />
                   
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="relative min-w-0">
+                  <div className="grid grid-cols-2 gap-3 w-full">
+                    <div className="relative w-full overflow-hidden rounded-xl">
                       <i className="fa-solid fa-dollar-sign absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                      <input type="number" required min="0" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-full min-w-0 py-3.5 pl-8 pr-3 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400 font-bold" placeholder="多少錢" disabled={isLoading} />
+                      <input type="number" required min="0" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-full min-w-0 py-3.5 pl-8 pr-3 bg-slate-50 outline-none focus:ring-2 focus:ring-yellow-400 font-bold" placeholder="多少錢" disabled={isLoading} />
                     </div>
-                    <div className="relative min-w-0">
+                    <div className="relative w-full overflow-hidden rounded-xl">
                       <input type="date" value={newItem.date} onChange={e => setNewItem({...newItem, date: e.target.value})} className="w-full min-w-0 px-3 py-3.5 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400 text-sm" disabled={isLoading} />
                     </div>
                   </div>
@@ -1091,21 +1065,15 @@
             </div>
           )}
 
-          {/* === 新增：圖片放大預覽 Modal === */}
-          {previewImage && (
-            <div 
-              className="fixed inset-0 z-[120] flex items-center justify-center bg-black/90 backdrop-blur-sm animate-in fade-in duration-200 p-4"
-              onClick={() => setPreviewImage(null)}
-            >
-              <button 
-                className="absolute top-6 right-6 text-white bg-white/20 hover:bg-white/40 rounded-full w-10 h-10 flex items-center justify-center transition-colors z-10"
-                onClick={(e) => { e.stopPropagation(); setPreviewImage(null); }}
-              >
-                <i className="fa-solid fa-xmark text-xl"></i>
+          {/* === 新增：點擊放大圖片的 Lightbox Modal === */}
+          {enlargedImage && (
+            <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setEnlargedImage(null)}>
+              <button className="absolute top-6 right-6 text-white/70 hover:text-white p-2 z-10 transition-colors" onClick={() => setEnlargedImage(null)}>
+                <i className="fa-solid fa-xmark text-3xl"></i>
               </button>
               <img 
-                src={previewImage} 
-                className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
+                src={enlargedImage} 
+                className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl" 
                 onClick={(e) => e.stopPropagation()} 
               />
             </div>
