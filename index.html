@@ -511,9 +511,11 @@
         );
       }
 
+      // 已登入狀態 - 主畫面
       return (
         <div className="min-h-screen bg-slate-50 text-slate-800 pb-24 overflow-x-hidden relative">
           
+          {/* === 自訂確認刪除彈窗 === */}
           {confirmDialog.isOpen && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
               <div className="bg-white rounded-3xl w-full max-w-xs p-6 shadow-2xl animate-in zoom-in-95 flex flex-col items-center text-center">
@@ -530,6 +532,7 @@
             </div>
           )}
 
+          {/* Toast 提示 */}
           {toastMessage && (
             <div className={`fixed top-10 left-1/2 -translate-x-1/2 z-[110] px-6 py-3 rounded-full shadow-lg flex items-center gap-2 animate-in slide-in-from-top-4 text-sm ${toastType === 'error' ? 'bg-red-600 text-white' : 'bg-slate-800 text-white'}`}>
               {toastType === 'error' ? <i className="fa-solid fa-circle-exclamation"></i> : <i className="fa-solid fa-circle-check text-green-400"></i>}{toastMessage}
@@ -626,7 +629,7 @@
                       </div>
                       <div className={`relative z-10 bg-white w-full h-full transition-transform duration-300 ${swipedItemId === item.id ? '-translate-x-[120px]' : ''}`} onTouchStart={handleTouchStart} onTouchMove={(e) => handleTouchMove(e, item.id, 'item')}>
                         <div className="aspect-square bg-slate-50 relative overflow-hidden">
-                          {/* === 修改：加入點擊放大 === */}
+                          {/* === 圖片點擊放大 === */}
                           {item.image ? <img src={item.image} onClick={() => setEnlargedImage(item.image)} className="w-full h-full object-cover cursor-pointer" /> : <div className="w-full h-full flex items-center justify-center text-slate-200"><i className="fa-solid fa-image text-4xl"></i></div>}
                           <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-black text-yellow-600 uppercase">{item.category}</div>
                         </div>
@@ -642,7 +645,8 @@
             </div>
           </main>
 
-          <button onClick={() => { closeItemModal(); setIsModalOpen(true); }} className="absolute bottom-6 right-6 z-30 bg-yellow-500 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center border-4 border-white transition-transform active:scale-90">
+          {/* === 修改：修復主畫面新增按鈕消失的問題 (改回 fixed) === */}
+          <button onClick={() => { closeItemModal(); setIsModalOpen(true); }} className="fixed bottom-6 right-6 z-30 bg-yellow-500 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center border-4 border-white transition-transform active:scale-90">
             <i className="fa-solid fa-plus text-xl"></i>
           </button>
 
@@ -699,7 +703,9 @@
             </div>
           )}
 
+          {/* ============================================================== */}
           {/* Modal: 待收包裹 主介面 */}
+          {/* ============================================================== */}
           {isPackageListOpen && (
             <div className="fixed inset-0 z-[50] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full overflow-hidden">
               <div className="bg-white px-4 py-3 sm:px-6 sm:py-4 shadow-sm border-b flex justify-between items-center sticky top-0 z-10">
@@ -742,7 +748,7 @@
                         </div>
                         <div className={`relative z-10 bg-white w-full h-full transition-transform duration-300 ${swipedPackageId === pkg.id ? '-translate-x-[120px]' : ''}`} onTouchStart={handleTouchStart} onTouchMove={(e) => handleTouchMove(e, pkg.id, 'package')}>
                           <div className="aspect-square bg-slate-50 relative overflow-hidden">
-                            {/* === 修改：加入點擊放大 === */}
+                            {/* === 圖片點擊放大 === */}
                             {pkg.image ? <img src={pkg.image} onClick={() => setEnlargedImage(pkg.image)} className="w-full h-full object-cover opacity-90 cursor-pointer" /> : <div className="w-full h-full flex items-center justify-center text-slate-200 bg-slate-100"><i className="fa-solid fa-box text-4xl"></i></div>}
                             <div className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black uppercase backdrop-blur-sm shadow-sm
                               ${pkg.category === '已到貨' ? 'bg-green-500/90 text-white' : 
@@ -851,7 +857,9 @@
             </div>
           )}
 
+          {/* ============================================================== */}
           {/* Modal: 許願池主介面 */}
+          {/* ============================================================== */}
           {isWishlistOpen && (
             <div className="fixed inset-0 z-[50] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full overflow-hidden">
               <div className="bg-white px-4 py-3 sm:px-6 sm:py-4 shadow-sm border-b flex justify-between items-center sticky top-0 z-10">
@@ -894,7 +902,7 @@
                         </div>
                         <div className={`relative z-10 bg-white w-full h-full transition-transform duration-300 ${swipedWishId === wish.id ? '-translate-x-[120px]' : ''}`} onTouchStart={handleTouchStart} onTouchMove={(e) => handleTouchMove(e, wish.id, 'wish')}>
                           <div className="aspect-square bg-slate-50 relative overflow-hidden">
-                            {/* === 修改：加入點擊放大 === */}
+                            {/* === 圖片點擊放大 === */}
                             {wish.image ? <img src={wish.image} onClick={() => setEnlargedImage(wish.image)} className="w-full h-full object-cover opacity-80 cursor-pointer" /> : <div className="w-full h-full flex items-center justify-center text-slate-200 bg-slate-100"><i className="fa-solid fa-gift text-4xl"></i></div>}
                             <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-black text-yellow-600 uppercase">{wish.category}</div>
                             <div className="absolute bottom-2 right-2 bg-yellow-400/90 backdrop-blur-sm text-white w-6 h-6 rounded-full flex items-center justify-center shadow-sm"><i className="fa-solid fa-star text-[10px]"></i></div>
@@ -1088,5 +1096,4 @@
   </script>
 </body>
 </html>
-
 
