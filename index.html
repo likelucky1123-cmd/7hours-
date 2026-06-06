@@ -73,7 +73,8 @@
 
     const { useState, useEffect, useRef } = React;
     const CATEGORIES = ['小卡', '專輯', '娃娃', '野周', '其他'];
-    const PACKAGE_CATEGORIES = ['預購', '未出貨', '已出貨', '已到貨']; 
+    // === 修正：加入「已收貨」至分類末端 ===
+    const PACKAGE_CATEGORIES = ['預購', '未出貨', '已出貨', '已到貨', '已收貨']; 
 
     function App() {
       // === 狀態管理 ===
@@ -90,6 +91,10 @@
       const [activeWishCategory, setActiveWishCategory] = useState('全部'); 
       const [activePackageCategory, setActivePackageCategory] = useState('全部'); 
       
+      // 搜尋狀態控制
+      const [isSearching, setIsSearching] = useState(false);
+      const [searchQuery, setSearchQuery] = useState('');
+
       const [swipedItemId, setSwipedItemId] = useState(null);
       const [swipedWishId, setSwipedWishId] = useState(null); 
       const [swipedPackageId, setSwipedPackageId] = useState(null); 
@@ -105,7 +110,7 @@
       const [isPackageListOpen, setIsPackageListOpen] = useState(false); 
       const [isPackageFormOpen, setIsPackageFormOpen] = useState(false); 
       
-      // === 新增：放大圖片狀態 ===
+      // 放大圖片狀態
       const [enlargedImage, setEnlargedImage] = useState(null);
 
       // 自訂確認刪除彈窗狀態
@@ -457,8 +462,12 @@
         }
       };
 
-      // === 過濾邏輯 ===
-      const filteredItems = activeCategory === '全部' ? items : items.filter(i => (i.category || '其他') === activeCategory);
+      // === 過濾邏輯 (搜尋功能支援) ===
+      const filteredItems = items.filter(i => {
+        const matchCat = activeCategory === '全部' ? true : (i.category || '其他') === activeCategory;
+        const matchSearch = !searchQuery ? true : (i.name && i.name.toLowerCase().includes(searchQuery.toLowerCase()));
+        return matchCat && matchSearch;
+      });
       const filteredWishes = activeWishCategory === '全部' ? wishes : wishes.filter(w => (w.category || '其他') === activeWishCategory);
       const filteredPackages = activePackageCategory === '全部' ? packages : packages.filter(p => (p.category || '未出貨') === activePackageCategory);
 
@@ -511,7 +520,6 @@
         );
       }
 
-      // 已登入狀態 - 主畫面
       return (
         <div className="min-h-screen bg-slate-50 text-slate-800 pb-24 overflow-x-hidden relative">
           
@@ -549,7 +557,7 @@
 
           <main className="max-w-4xl mx-auto px-4 py-6 space-y-8">
             
-            {/* 預算卡片：完全保留前次滿意佈局 */}
+            {/* 看板卡片 */}
             <div className="rounded-3xl p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden min-h-[220px] flex items-center group border border-slate-200">
               {profileData?.dashboardBg ? (
                 <div className="absolute inset-0 bg-cover bg-center z-0 transition-transform duration-700 group-hover:scale-105" style={{ backgroundImage: `url(${profileData.dashboardBg})` }}><div className="absolute inset-0 bg-slate-900/30"></div></div>
@@ -604,9 +612,28 @@
 
             {/* 列表內容 (展示櫃) */}
             <div className="space-y-4">
-              <div className="flex justify-between items-center px-1">
-                <h3 className="font-bold text-slate-700 flex items-center gap-2"><i className="fa-solid fa-box-open text-yellow-500"></i> 我的展示櫃</h3>
+              
+              <div className="flex justify-between items-center px-1 h-8">
+                {!isSearching ? (
+                  <>
+                    <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                      <i className="fa-solid fa-box-open text-yellow-500"></i> 我的展示櫃
+                    </h3>
+                    <button onClick={() => setIsSearching(true)} className="text-slate-400 hover:text-yellow-500 transition-colors p-1">
+                      <i className="fa-solid fa-magnifying-glass"></i>
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex-1 flex items-center gap-2 bg-slate-100 rounded-full px-3 py-1.5 w-full animate-in fade-in h-full">
+                    <i className="fa-solid fa-magnifying-glass text-yellow-500 text-sm"></i>
+                    <input autoFocus type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="搜尋戰利品名稱..." className="flex-1 bg-transparent border-none outline-none text-sm min-w-0 text-slate-700" />
+                    <button onClick={() => { setIsSearching(false); setSearchQuery(''); }} className="text-slate-400 hover:text-slate-600 px-1">
+                      <i className="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+                )}
               </div>
+
               <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
                 {['全部', ...CATEGORIES].map(c => (
                   <button key={c} onClick={() => setActiveCategory(c)} className={`whitespace-nowrap px-6 py-2.5 rounded-full text-sm font-bold transition-all shadow-sm ${activeCategory === c ? 'bg-yellow-500 text-white shadow-yellow-500/20' : 'bg-white text-slate-600 border border-slate-200'}`}>{c}</button>
@@ -616,8 +643,8 @@
               {filteredItems.length === 0 ? (
                 <div className="bg-white rounded-3xl p-8 text-center shadow-sm border border-slate-100 flex flex-col items-center justify-center min-h-[25vh]">
                   <div className="w-16 h-16 bg-yellow-50 rounded-full flex items-center justify-center mb-4"><i className="fa-solid fa-tag text-2xl text-yellow-300"></i></div>
-                  <p className="text-slate-500 font-medium">這個分類還沒有收藏喔！</p>
-                  <p className="text-slate-400 text-sm mt-1 mb-6">點擊右下角按鈕新增一筆吧</p>
+                  <p className="text-slate-500 font-medium">{searchQuery ? '找不到相關的戰利品' : '這個分類還沒有收藏喔！'}</p>
+                  <p className="text-slate-400 text-sm mt-1 mb-6">{searchQuery ? '換個關鍵字試試看吧' : '點擊右下角按鈕新增一筆吧'}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -629,7 +656,6 @@
                       </div>
                       <div className={`relative z-10 bg-white w-full h-full transition-transform duration-300 ${swipedItemId === item.id ? '-translate-x-[120px]' : ''}`} onTouchStart={handleTouchStart} onTouchMove={(e) => handleTouchMove(e, item.id, 'item')}>
                         <div className="aspect-square bg-slate-50 relative overflow-hidden">
-                          {/* === 圖片點擊放大 === */}
                           {item.image ? <img src={item.image} onClick={() => setEnlargedImage(item.image)} className="w-full h-full object-cover cursor-pointer" /> : <div className="w-full h-full flex items-center justify-center text-slate-200"><i className="fa-solid fa-image text-4xl"></i></div>}
                           <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-black text-yellow-600 uppercase">{item.category}</div>
                         </div>
@@ -645,7 +671,6 @@
             </div>
           </main>
 
-          {/* === 修改：修復主畫面新增按鈕消失的問題 (改回 fixed) === */}
           <button onClick={() => { closeItemModal(); setIsModalOpen(true); }} className="fixed bottom-6 right-6 z-30 bg-yellow-500 text-white w-14 h-14 rounded-full shadow-xl flex items-center justify-center border-4 border-white transition-transform active:scale-90">
             <i className="fa-solid fa-plus text-xl"></i>
           </button>
@@ -703,9 +728,7 @@
             </div>
           )}
 
-          {/* ============================================================== */}
           {/* Modal: 待收包裹 主介面 */}
-          {/* ============================================================== */}
           {isPackageListOpen && (
             <div className="fixed inset-0 z-[50] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full overflow-hidden">
               <div className="bg-white px-4 py-3 sm:px-6 sm:py-4 shadow-sm border-b flex justify-between items-center sticky top-0 z-10">
@@ -748,11 +771,11 @@
                         </div>
                         <div className={`relative z-10 bg-white w-full h-full transition-transform duration-300 ${swipedPackageId === pkg.id ? '-translate-x-[120px]' : ''}`} onTouchStart={handleTouchStart} onTouchMove={(e) => handleTouchMove(e, pkg.id, 'package')}>
                           <div className="aspect-square bg-slate-50 relative overflow-hidden">
-                            {/* === 圖片點擊放大 === */}
                             {pkg.image ? <img src={pkg.image} onClick={() => setEnlargedImage(pkg.image)} className="w-full h-full object-cover opacity-90 cursor-pointer" /> : <div className="w-full h-full flex items-center justify-center text-slate-200 bg-slate-100"><i className="fa-solid fa-box text-4xl"></i></div>}
                             <div className={`absolute top-2 left-2 px-2 py-0.5 rounded text-[10px] font-black uppercase backdrop-blur-sm shadow-sm
                               ${pkg.category === '已到貨' ? 'bg-green-500/90 text-white' : 
                                 pkg.category === '已出貨' ? 'bg-blue-500/90 text-white' : 
+                                pkg.category === '已收貨' ? 'bg-purple-500/90 text-white' :
                                 'bg-white/90 text-orange-600'}`
                             }>
                               {pkg.category}
@@ -857,9 +880,7 @@
             </div>
           )}
 
-          {/* ============================================================== */}
           {/* Modal: 許願池主介面 */}
-          {/* ============================================================== */}
           {isWishlistOpen && (
             <div className="fixed inset-0 z-[50] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full overflow-hidden">
               <div className="bg-white px-4 py-3 sm:px-6 sm:py-4 shadow-sm border-b flex justify-between items-center sticky top-0 z-10">
@@ -902,7 +923,6 @@
                         </div>
                         <div className={`relative z-10 bg-white w-full h-full transition-transform duration-300 ${swipedWishId === wish.id ? '-translate-x-[120px]' : ''}`} onTouchStart={handleTouchStart} onTouchMove={(e) => handleTouchMove(e, wish.id, 'wish')}>
                           <div className="aspect-square bg-slate-50 relative overflow-hidden">
-                            {/* === 圖片點擊放大 === */}
                             {wish.image ? <img src={wish.image} onClick={() => setEnlargedImage(wish.image)} className="w-full h-full object-cover opacity-80 cursor-pointer" /> : <div className="w-full h-full flex items-center justify-center text-slate-200 bg-slate-100"><i className="fa-solid fa-gift text-4xl"></i></div>}
                             <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-black text-yellow-600 uppercase">{wish.category}</div>
                             <div className="absolute bottom-2 right-2 bg-yellow-400/90 backdrop-blur-sm text-white w-6 h-6 rounded-full flex items-center justify-center shadow-sm"><i className="fa-solid fa-star text-[10px]"></i></div>
@@ -1000,10 +1020,10 @@
                   <div className="grid grid-cols-2 gap-3 w-full">
                     <div className="relative w-full overflow-hidden rounded-xl">
                       <i className="fa-solid fa-dollar-sign absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                      <input type="number" required min="0" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-full min-w-0 py-3.5 pl-8 pr-3 bg-slate-50 outline-none focus:ring-2 focus:ring-yellow-400 font-bold" placeholder="多少錢" disabled={isLoading} />
+                      <input type="number" required min="0" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-full min-w-0 box-border py-3.5 pl-8 pr-3 bg-slate-50 outline-none focus:ring-2 focus:ring-yellow-400 font-bold" placeholder="多少錢" disabled={isLoading} />
                     </div>
                     <div className="relative w-full overflow-hidden rounded-xl">
-                      <input type="date" value={newItem.date} onChange={e => setNewItem({...newItem, date: e.target.value})} className="w-full min-w-0 px-3 py-3.5 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400 text-sm" disabled={isLoading} />
+                      <input type="date" value={newItem.date} onChange={e => setNewItem({...newItem, date: e.target.value})} className="w-full box-border px-3 py-3.5 bg-slate-50 outline-none focus:ring-2 focus:ring-yellow-400 text-sm" disabled={isLoading} />
                     </div>
                   </div>
 
@@ -1073,7 +1093,7 @@
             </div>
           )}
 
-          {/* === 新增：點擊放大圖片的 Lightbox Modal === */}
+          {/* === 點擊放大圖片的 Lightbox Modal === */}
           {enlargedImage && (
             <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setEnlargedImage(null)}>
               <button className="absolute top-6 right-6 text-white/70 hover:text-white p-2 z-10 transition-colors" onClick={() => setEnlargedImage(null)}>
