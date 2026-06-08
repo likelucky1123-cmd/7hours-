@@ -73,7 +73,6 @@
 
     const { useState, useEffect, useRef } = React;
     const CATEGORIES = ['小卡', '專輯', '娃娃', '野周', '其他'];
-    // === 修正：加入「已收貨」至分類末端 ===
     const PACKAGE_CATEGORIES = ['預購', '未出貨', '已出貨', '已到貨', '已收貨']; 
 
     function App() {
@@ -94,6 +93,14 @@
       // 搜尋狀態控制
       const [isSearching, setIsSearching] = useState(false);
       const [searchQuery, setSearchQuery] = useState('');
+
+      // 包裹專用搜尋狀態
+      const [isSearchingPackage, setIsSearchingPackage] = useState(false);
+      const [packageSearchQuery, setPackageSearchQuery] = useState('');
+
+      // 許願池專用搜尋狀態
+      const [isSearchingWish, setIsSearchingWish] = useState(false);
+      const [wishSearchQuery, setWishSearchQuery] = useState('');
 
       const [swipedItemId, setSwipedItemId] = useState(null);
       const [swipedWishId, setSwipedWishId] = useState(null); 
@@ -468,8 +475,24 @@
         const matchSearch = !searchQuery ? true : (i.name && i.name.toLowerCase().includes(searchQuery.toLowerCase()));
         return matchCat && matchSearch;
       });
-      const filteredWishes = activeWishCategory === '全部' ? wishes : wishes.filter(w => (w.category || '其他') === activeWishCategory);
-      const filteredPackages = activePackageCategory === '全部' ? packages : packages.filter(p => (p.category || '未出貨') === activePackageCategory);
+
+      // 許願池篩選過濾邏輯，支援依據名稱進行搜尋過濾
+      const filteredWishes = wishes.filter(w => {
+        const matchCat = activeWishCategory === '全部' ? true : (w.category || '其他') === activeWishCategory;
+        const matchSearch = !wishSearchQuery ? true : (w.name && w.name.toLowerCase().includes(wishSearchQuery.toLowerCase()));
+        return matchCat && matchSearch;
+      });
+      
+      const filteredPackages = packages.filter(p => {
+        const matchCat = activePackageCategory === '全部' ? true : (p.category || '未出貨') === activePackageCategory;
+        const q = packageSearchQuery.trim().toLowerCase();
+        const matchSearch = !q ? true : (
+          (p.name && p.name.toLowerCase().includes(q)) ||
+          (p.seller && p.seller.toLowerCase().includes(q)) ||
+          (p.orderNumber && p.orderNumber.toLowerCase().includes(q))
+        );
+        return matchCat && matchSearch;
+      });
 
       // === 財務計算 ===
       const formatCurrency = (val) => new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0 }).format(val || 0);
@@ -509,7 +532,7 @@
                 {authError && <div className="bg-red-50 text-red-600 p-3 rounded-xl text-xs flex items-center gap-2"><i className="fa-solid fa-circle-exclamation"></i>{authError}</div>}
                 <div className="relative"><i className="fa-solid fa-envelope absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i><input type="email" required value={authForm.email} onChange={(e) => setAuthForm({...authForm, email: e.target.value})} className="w-full pl-11 pr-4 py-3.5 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400" placeholder="Email" /></div>
                 <div className="relative"><i className="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i><input type="password" required value={authForm.password} onChange={(e) => setAuthForm({...authForm, password: e.target.value})} className="w-full pl-11 pr-4 py-3.5 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400" placeholder="密碼 (至少6字元)" minLength="6" /></div>
-                {!isLoginMode && (<div className="relative"><i className="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i><input type="password" required value={authForm.confirmPassword} onChange={(e) => setAuthForm({...authForm, confirmPassword: e.target.value})} className="w-full pl-11 pr-4 py-3.5 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400" placeholder="確認密碼" minLength="6" /></div>)}
+                {!isLoginMode && (<div className="relative"><i className="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i><input type="password" required value={authForm.confirmPassword} onChange={(e) => setAuthForm({...authForm, confirmPassword: e.target.value})} className="w-full min-w-0 py-3.5 bg-slate-50 rounded-xl border outline-none focus:ring-2 focus:ring-yellow-400 text-sm" placeholder="確認密碼" minLength="6" /></div>)}
                 <button type="submit" disabled={isAuthProcessing} className="w-full bg-yellow-500 text-white font-bold py-3.5 rounded-xl shadow-lg mt-2 transition-transform active:scale-95 flex justify-center items-center gap-2 disabled:bg-yellow-300">
                   {isAuthProcessing ? <i className="fa-solid fa-spinner fa-spin"></i> : <>{isLoginMode ? '登入帳號' : '註冊雲端帳號'} <i className="fa-solid fa-arrow-right"></i></>}
                 </button>
@@ -520,6 +543,7 @@
         );
       }
 
+      // 已登入狀態 - 主畫面
       return (
         <div className="min-h-screen bg-slate-50 text-slate-800 pb-24 overflow-x-hidden relative">
           
@@ -557,7 +581,7 @@
 
           <main className="max-w-4xl mx-auto px-4 py-6 space-y-8">
             
-            {/* 看板卡片 */}
+            {/* 看板卡片：保留最初完美大小與佈局 */}
             <div className="rounded-3xl p-6 sm:p-8 text-white shadow-2xl relative overflow-hidden min-h-[220px] flex items-center group border border-slate-200">
               {profileData?.dashboardBg ? (
                 <div className="absolute inset-0 bg-cover bg-center z-0 transition-transform duration-700 group-hover:scale-105" style={{ backgroundImage: `url(${profileData.dashboardBg})` }}><div className="absolute inset-0 bg-slate-900/30"></div></div>
@@ -573,11 +597,12 @@
                 >
                   <i className="fa-solid fa-star text-yellow-300 drop-shadow-sm"></i> <span className="drop-shadow-sm">許願池</span>
                 </button>
+                {/* === 修改：按鈕名稱「待收包裹」更名為「包裹」 === */}
                 <button 
                   onClick={() => setIsPackageListOpen(true)} 
                   className="bg-black/10 hover:bg-black/20 backdrop-blur-md border border-white/20 text-white px-3 py-1.5 rounded-full text-xs font-bold tracking-wider inline-flex items-center gap-1.5 transition-all shadow-sm"
                 >
-                  <i className="fa-solid fa-box-open text-orange-300 drop-shadow-sm"></i> <span className="drop-shadow-sm">待收包裹</span>
+                  <i className="fa-solid fa-box-open text-orange-300 drop-shadow-sm"></i> <span className="drop-shadow-sm">包裹</span>
                 </button>
               </div>
 
@@ -728,19 +753,46 @@
             </div>
           )}
 
-          {/* Modal: 待收包裹 主介面 */}
+          {/* ============================================================== */}
+          {/* Modal: 包裹 主介面 (更名：待收包裹 -> 包裹) */}
+          {/* ============================================================== */}
           {isPackageListOpen && (
             <div className="fixed inset-0 z-[50] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full overflow-hidden">
               <div className="bg-white px-4 py-3 sm:px-6 sm:py-4 shadow-sm border-b flex justify-between items-center sticky top-0 z-10">
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setIsPackageListOpen(false)} className="bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center hover:bg-slate-200 transition-colors">
+                  <button onClick={() => { setIsPackageListOpen(false); setIsSearchingPackage(false); setPackageSearchQuery(''); }} className="bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center hover:bg-slate-200 transition-colors shrink-0">
                     <i className="fa-solid fa-arrow-left text-slate-600"></i>
                   </button>
-                  <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                    <i className="fa-solid fa-box-open text-orange-400"></i> 待收包裹
-                  </h2>
+                  
+                  {!isSearchingPackage ? (
+                    <div className="flex items-center gap-2">
+                      {/* === 修改：標題更名為「包裹」 === */}
+                      <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <i className="fa-solid fa-box-open text-orange-400"></i> 包裹
+                      </h2>
+                      <button onClick={() => setIsSearchingPackage(true)} className="text-slate-400 hover:text-orange-500 transition-colors p-1">
+                        <i className="fa-solid fa-magnifying-glass"></i>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 bg-slate-100 rounded-full px-3 py-1.5 animate-in fade-in h-9 w-[180px] sm:w-[240px]">
+                      <i className="fa-solid fa-magnifying-glass text-orange-500 text-sm"></i>
+                      <input 
+                        autoFocus 
+                        type="text" 
+                        value={packageSearchQuery} 
+                        onChange={e => setPackageSearchQuery(e.target.value)} 
+                        placeholder="搜尋物品/賣家/單號..." 
+                        className="flex-1 bg-transparent border-none outline-none text-xs min-w-0 text-slate-700" 
+                      />
+                      <button onClick={() => { setIsSearchingPackage(false); setPackageSearchQuery(''); }} className="text-slate-400 hover:text-slate-600 px-1">
+                        <i className="fa-solid fa-xmark"></i>
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div className="text-right">
+
+                <div className="text-right shrink-0">
                   <p className="text-xs text-slate-400 font-bold mb-0.5">
                     {activePackageCategory === '全部' ? '包裹總金額' : `${activePackageCategory}總額`}
                   </p>
@@ -885,14 +937,38 @@
             <div className="fixed inset-0 z-[50] bg-slate-50 flex flex-col animate-in slide-in-from-bottom-full overflow-hidden">
               <div className="bg-white px-4 py-3 sm:px-6 sm:py-4 shadow-sm border-b flex justify-between items-center sticky top-0 z-10">
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setIsWishlistOpen(false)} className="bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center hover:bg-slate-200 transition-colors">
+                  <button onClick={() => { setIsWishlistOpen(false); setIsSearchingWish(false); setWishSearchQuery(''); }} className="bg-slate-100 w-10 h-10 rounded-full flex items-center justify-center hover:bg-slate-200 transition-colors shrink-0">
                     <i className="fa-solid fa-arrow-left text-slate-600"></i>
                   </button>
-                  <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                    <i className="fa-solid fa-star text-yellow-400"></i> 許願池
-                  </h2>
+                  
+                  {!isSearchingWish ? (
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <i className="fa-solid fa-star text-yellow-400"></i> 許願池
+                      </h2>
+                      <button onClick={() => setIsSearchingWish(true)} className="text-slate-400 hover:text-yellow-500 transition-colors p-1">
+                        <i className="fa-solid fa-magnifying-glass"></i>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 bg-slate-100 rounded-full px-3 py-1.5 animate-in fade-in h-9 w-[180px] sm:w-[240px]">
+                      <i className="fa-solid fa-magnifying-glass text-yellow-500 text-sm"></i>
+                      <input 
+                        autoFocus 
+                        type="text" 
+                        value={wishSearchQuery} 
+                        onChange={e => setWishSearchQuery(e.target.value)} 
+                        placeholder="搜尋許願物品名稱..." 
+                        className="flex-1 bg-transparent border-none outline-none text-xs min-w-0 text-slate-700" 
+                      />
+                      <button onClick={() => { setIsSearchingWish(false); setWishSearchQuery(''); }} className="text-slate-400 hover:text-slate-600 px-1">
+                        <i className="fa-solid fa-xmark"></i>
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div className="text-right">
+                
+                <div className="text-right shrink-0">
                   <p className="text-xs text-slate-400 font-bold mb-0.5">
                     {activeWishCategory === '全部' ? '總需金額' : `${activeWishCategory}總計`}
                   </p>
@@ -910,8 +986,8 @@
                 {filteredWishes.length === 0 ? (
                   <div className="bg-white rounded-3xl p-8 text-center shadow-sm border border-slate-100 flex flex-col items-center justify-center min-h-[40vh]">
                     <div className="w-20 h-20 bg-yellow-50 rounded-full flex items-center justify-center mb-4"><i className="fa-solid fa-wand-magic-sparkles text-3xl text-yellow-300"></i></div>
-                    <p className="text-slate-600 font-bold text-lg">許願池空空如也！</p>
-                    <p className="text-slate-400 text-sm mt-2 mb-6">有什麼想買的酷東西嗎？趕快加進來吧</p>
+                    <p className="text-slate-600 font-bold text-lg">{wishSearchQuery ? '找不到相關的許願' : '許願池空空如也！'}</p>
+                    <p className="text-slate-400 text-sm mt-2 mb-6">{wishSearchQuery ? '換個關鍵字試試看吧' : '有什麼想買的酷東西嗎？擺進來看看'}</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -1020,7 +1096,7 @@
                   <div className="grid grid-cols-2 gap-3 w-full">
                     <div className="relative w-full overflow-hidden rounded-xl">
                       <i className="fa-solid fa-dollar-sign absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                      <input type="number" required min="0" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-full min-w-0 box-border py-3.5 pl-8 pr-3 bg-slate-50 outline-none focus:ring-2 focus:ring-yellow-400 font-bold" placeholder="多少錢" disabled={isLoading} />
+                      <input type="number" required min="0" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} className="w-full min-w-0 py-3.5 pl-8 pr-3 bg-slate-50 outline-none focus:ring-2 focus:ring-yellow-400 font-bold" placeholder="多少錢" disabled={isLoading} />
                     </div>
                     <div className="relative w-full overflow-hidden rounded-xl">
                       <input type="date" value={newItem.date} onChange={e => setNewItem({...newItem, date: e.target.value})} className="w-full box-border px-3 py-3.5 bg-slate-50 outline-none focus:ring-2 focus:ring-yellow-400 text-sm" disabled={isLoading} />
@@ -1116,4 +1192,3 @@
   </script>
 </body>
 </html>
-
