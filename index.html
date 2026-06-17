@@ -8,16 +8,16 @@
   <link rel="icon" href="IMG_2669.jpeg">
   <link rel="apple-touch-icon" href="IMG_2669.jpeg">
 
-  <!-- 1. 載入 Tailwind CSS -->
+  <!-- 1. 載入 Tailwind CSS (由穩定 CDN 提供) -->
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <!-- 2. 載入 FontAwesome 圖標庫 -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- 2. 載入 FontAwesome 圖標庫 (升級至 jsdelivr 穩定版) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
   
-  <!-- 3. 載入 React 核心 -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- 3. 載入 React 核心 (全面改用穩定的 cdnjs，防止 unpkg 連線失敗導致空白頁) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.21.4/babel.min.js"></script>
 
   <!-- 4. 載入 Firebase 穩定版引擎 -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -709,7 +709,7 @@
                           {/* 戰利品金額 */}
                           <div className="text-yellow-500 font-black mt-1">{formatCurrency(item.price)}</div>
                           
-                          {/* === 修改：去除標籤背景，下移並與位置完全同高並排對齊 === */}
+                          {/* 標籤對齊調整 */}
                           <div className="flex justify-between items-center mt-1.5 text-[10px] text-slate-400 min-h-[16px]">
                             <div className="truncate flex-1 pr-2" title={item.location ? `存放位置: ${item.location}` : ''}>
                               {item.location ? (
@@ -741,7 +741,7 @@
           </button>
 
           {/* ======================================= */}
-          {/* 以下為 Modals 彈窗區域            */}
+          {/* Modals 彈窗區域                         */}
           {/* ======================================= */}
 
           {/* Modal: 編輯個人資料 */}
@@ -1115,7 +1115,6 @@
                   <button type="button" onClick={closeItemModal} disabled={isLoading} className="text-slate-400 hover:bg-slate-100 p-2 rounded-full"><i className="fa-solid fa-xmark text-lg"></i></button>
                 </div>
                 
-                {/* === 已修正：加入 overscroll-contain 與防穿透滾動機制 === */}
                 <form onSubmit={handleSaveItem} className="p-6 overflow-y-auto space-y-4 scrollbar-hide overscroll-contain">
                   <div className="h-40 border-2 border-dashed rounded-2xl relative overflow-hidden flex items-center justify-center bg-slate-50 group shrink-0">
                     <input type="file" onChange={handleItemImageUpload} className="absolute inset-0 opacity-0 z-10 cursor-pointer" disabled={isLoading} />
@@ -1157,7 +1156,6 @@
                       />
                     </div>
                     
-                    {/* === 已修正：改回原生 Select 選擇框，預設顯示「單收」，內含「盤收」或「單收」選擇 === */}
                     <div className="relative w-full h-[48px] overflow-hidden rounded-xl border bg-white">
                       <select 
                         value={newItem.buyType} 
@@ -1238,7 +1236,7 @@
             </div>
           )}
 
-          {/* === 點擊放大圖片的 Lightbox Modal === */}
+          {/* Lightbox Modal */}
           {enlargedImage && (
             <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setEnlargedImage(null)}>
               <button className="absolute top-6 right-6 text-white/70 hover:text-white p-2 z-10 transition-colors" onClick={() => setEnlargedImage(null)}>
@@ -1261,3 +1259,4 @@
   </script>
 </body>
 </html>
+
